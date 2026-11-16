@@ -1,0 +1,21 @@
+[package]
+name = "mlirbinary"
+version = "0.1.0"
+edition = "2024"
+description = "Binary formats of MLIR modules in Rust: write and read them as mlirformat IR, with formats as plugins (SPIR-V built in)"
+license = "MIT"
+repository = "https://github.com/Jabberwocky238/mlirbinary"
+readme = "README.md"
+keywords = ["mlir", "spirv", "binary", "serialization", "compiler"]
+categories = ["compilers", "encoding", "no-std"]
+exclude = ["tests"]
+
+[dependencies]
+mlirformat = { git = "https://github.com/Jabberwocky238/mlirformat.git", tag = "0.8.5", version = "0.8.5", default-features = false }
+
+[features]
+default = ["std", "spirv"]
+# The standard library (without it the crate is `no_std` and needs `alloc`), mlirformat's `std`
+std = ["mlirformat/std"]
+# The SPIR-V binary format (`SpirvFormat`)
+spirv = []
