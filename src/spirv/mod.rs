@@ -146,7 +146,7 @@ impl OpSpec<'_> {
 
 impl OpSpec<'static> {
     const fn shader(name: &'static str, code: Code<'static>) -> OpSpec<'static> {
-        OpSpec { name, code, autogen: true, plain: true, results: 1, groups: &[Group::One], args: &[Arg::Operands(0)], avail: Avail { min: Some(0), max: Some(6), exts: &[], caps: &[&["Shader"]] }, unsigned: false }
+        OpSpec { name, code, autogen: true, plain: false, results: 1, groups: &[Group::Variadic], args: &[Arg::Operands(0)], avail: Avail { min: Some(0), max: Some(6), exts: &[], caps: &[&["Shader"]] }, unsigned: false }
     }
 
     const STD450: &'static str = "GLSL.std.450";

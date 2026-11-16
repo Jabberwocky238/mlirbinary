@@ -1,6 +1,6 @@
 [package]
 name = "mlirbinary"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Binary formats of MLIR modules in Rust: write and read them as mlirformat IR, with formats as plugins (SPIR-V built in)"
 license = "MIT"
