@@ -33,8 +33,8 @@ dependencies = [
 
 [[package]]
 name = "mlirformat"
-version = "0.8.5"
-source = "git+https://github.com/Jabberwocky238/mlirformat.git?tag=0.8.5#b80a0358a9753dbf24cea38bb8aca31e20f35194"
+version = "0.8.7"
+source = "git+https://github.com/Jabberwocky238/mlirformat.git?tag=0.8.7#363e38fb42205236972c713f906dbae4276fde19"
 dependencies = [
  "mlirformat-macros",
  "moremath",
@@ -46,8 +46,8 @@ dependencies = [
 
 [[package]]
 name = "mlirformat-macros"
-version = "0.8.5"
-source = "git+https://github.com/Jabberwocky238/mlirformat.git?tag=0.8.5#b80a0358a9753dbf24cea38bb8aca31e20f35194"
+version = "0.8.7"
+source = "git+https://github.com/Jabberwocky238/mlirformat.git?tag=0.8.7#363e38fb42205236972c713f906dbae4276fde19"
 dependencies = [
  "proc-macro2",
  "quote",

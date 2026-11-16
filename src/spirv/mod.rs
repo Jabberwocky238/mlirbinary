@@ -131,12 +131,12 @@ pub struct OpSpec<'t> {
 impl OpSpec<'_> {
     /// The op an opcode stands for
     pub fn code(op: u32) -> Option<&'static OpSpec<'static>> {
-        tables::OPS.iter().find(|o| matches!(o.code, Code::Op(c) if c == op))
+        tables::OPS.iter().chain(OpSpec::GRAPHICS).find(|o| matches!(o.code, Code::Op(c) if c == op))
     }
 
     /// The op of an extended instruction set's instruction
     pub fn ext(set: &str, n: u32) -> Option<&'static OpSpec<'static>> {
-        tables::OPS.iter().find(|o| matches!(o.code, Code::Ext(s, c) if s == set && c == n))
+        tables::OPS.iter().chain(OpSpec::GRAPHICS).find(|o| matches!(o.code, Code::Ext(s, c) if s == set && c == n))
     }
 
     pub fn of(name: &str) -> Option<&OpSpec<'_>> {

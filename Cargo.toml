@@ -11,7 +11,7 @@ categories = ["compilers", "encoding", "no-std"]
 exclude = ["tests"]
 
 [dependencies]
-mlirformat = { git = "https://github.com/Jabberwocky238/mlirformat.git", tag = "0.8.5", version = "0.8.5", default-features = false }
+mlirformat = { git = "https://github.com/Jabberwocky238/mlirformat.git", tag = "0.8.7", version = "0.8.7", default-features = false }
 
 [features]
 default = ["std", "spirv"]
