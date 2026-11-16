@@ -30,15 +30,17 @@ Nothing is global: a program's formats are the ones it loads.
 ## SPIR-V
 
 `SpirvFormat` (feature `spirv`, default) reads and writes SPIR-V as `mlir-translate` (LLVM 23.1.5) does,
-checked against MLIR's own 250 `Target/SPIRV` test modules:
+checked against MLIR's own 250 `Target/SPIRV` test modules, all of them:
 
-- reading (`--deserialize-spirv`): all 250 come out as `mlir-translate` makes them — structured
-  control flow rebuilt from the merge instructions, OpPhi as block arguments, constants
-  materialized at their uses, identified and recursive structs, spec constants and their
-  operations, ARM tensors and graphs (`cargo test --test read`; the text compared is the generic
-  form with SSA names renumbered);
-- writing (`--serialize-spirv`): 203 of 250 byte for byte (`cargo test --test write`; the others use
-  ops and decorations not written yet).
+- reading (`--deserialize-spirv`, `cargo test --test read`): structured control flow rebuilt from
+  the merge instructions, OpPhi as block arguments, constants materialized at their uses,
+  identified and recursive structs, spec constants and their operations, ARM tensors and graphs;
+  the text compared is the generic form with SSA names renumbered. `SpirvReader { structurize:
+  false }` is `--spirv-structurize-control-flow=false`: blocks stay a plain graph, which also reads
+  what structurization cannot, such as a loop left early (`tests/fixtures/spirv-unstructured`);
+- writing (`--serialize-spirv`, `cargo test --test write`): byte for byte;
+- reading then writing (`cargo test --test roundtrip`): byte for byte what `mlir-translate`
+  writes for the module it reads.
 
 The grammar tables (`src/spirv/tables.gen.rs`) are generated from the SPIR-V dialect's ODS by
 `scripts/spirv_tables.py`.

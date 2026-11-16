@@ -16,15 +16,29 @@ use tree::{At, B, O, Tree, V};
 
 /// SPIR-V words ⇒ a `spirv.module` in generic form, as `mlir-translate --deserialize-spirv`
 /// (LLVM 23.1.5) builds it
-pub struct SpirvReader;
+#[derive(Debug, Clone, Copy)]
+pub struct SpirvReader {
+    /// Put selections and loops into `spirv.mlir.selection` / `spirv.mlir.loop` (the default).
+    /// Without it a function stays a plain graph of blocks, as with
+    /// `--spirv-structurize-control-flow=false`: that reads what structurization cannot, such as
+    /// a loop left early (`break` / `return` inside it).
+    pub structurize: bool,
+}
+
+impl Default for SpirvReader {
+    fn default() -> Self {
+        Self { structurize: true }
+    }
+}
 
 impl SpirvReader {
-    pub fn read(bytes: &[u8]) -> Result<Operation<'static>, Error> {
+    pub fn read(&self, bytes: &[u8]) -> Result<Operation<'static>, Error> {
         if !bytes.len().is_multiple_of(Reader::WORD) {
             return Err(Error(format!("{} bytes are not whole SPIR-V words", bytes.len())));
         }
         let words: Vec<u32> = bytes.as_chunks::<{ Reader::WORD }>().0.iter().map(|w| u32::from_le_bytes(*w)).collect();
         let mut r = Reader::new(&words);
+        r.structurize = self.structurize;
         r.read()?;
         r.expand_all();
         Ok(r.tree.operation(r.module, &OpInfos::upstream()))
@@ -254,6 +268,7 @@ pub(super) struct Reader<'w> {
     literals: BTreeMap<u32, Vec<String>>,
     deferred: Vec<(u32, Vec<u32>)>,
     id_decorations: Vec<(u32, u32, u32)>,
+    structurize: bool,
 }
 
 impl<'w> Reader<'w> {
@@ -315,6 +330,7 @@ impl<'w> Reader<'w> {
             literals: BTreeMap::new(),
             deferred: Vec::new(),
             id_decorations: Vec::new(),
+            structurize: true,
         }
     }
 
@@ -1208,7 +1224,10 @@ impl<'w> Reader<'w> {
 
     fn function_end(&mut self) -> Result<(), Error> {
         self.wire_phis()?;
-        self.structurize()?;
+        if self.structurize {
+            self.structurize()?;
+        }
+        self.merges.clear();
         self.func = None;
         self.block = None;
         self.block_ids.clear();

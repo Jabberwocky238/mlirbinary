@@ -26,10 +26,11 @@ pub trait Format: Send + Sync {
 
 ## SPIR-V
 
-`SpirvFormat`（feature `spirv`，缺省开）按 `mlir-translate`（LLVM 23.1.5）的方式读写 SPIR-V，用 MLIR 自己的 250 个 `Target/SPIRV` 测试模块对拍：
+`SpirvFormat`（feature `spirv`，缺省开）按 `mlir-translate`（LLVM 23.1.5）的方式读写 SPIR-V，用 MLIR 自己的 250 个 `Target/SPIRV` 测试模块对拍，全部通过：
 
-- 读入（`--deserialize-spirv`）：250 个全部与 `mlir-translate` 的结果一致——按 merge 指令还原结构化控制流、OpPhi 变块参数、常量在使用处物化、具名与递归结构体、特化常量及其运算、ARM 张量与 graph（`cargo test --test read`；比较的是通用形式文本，SSA 名重新编号）；
-- 写入（`--serialize-spirv`）：250 个里 203 个逐字节一致（`cargo test --test write`；其余用到的 op 和修饰还没写）。
+- 读入（`--deserialize-spirv`，`cargo test --test read`）：按 merge 指令还原结构化控制流、OpPhi 变块参数、常量在使用处物化、具名与递归结构体、特化常量及其运算、ARM 张量与 graph；比较的是通用形式文本，SSA 名重新编号。`SpirvReader { structurize: false }` 即 `--spirv-structurize-control-flow=false`：块保持平铺的分支图，结构化读不了的（比如循环里提前退出）也能读（`tests/fixtures/spirv-unstructured`）；
+- 写入（`--serialize-spirv`，`cargo test --test write`）：逐字节一致；
+- 读入再写出（`cargo test --test roundtrip`）：与 `mlir-translate` 读入同一模块后写出的结果逐字节一致。
 
 指令表 `src/spirv/tables.gen.rs` 由 `scripts/spirv_tables.py` 从 SPIR-V 方言的 ODS 生成。
 

@@ -18,7 +18,7 @@ fn find<'o, 'a>(ops: &'o [Operation<'a>]) -> Option<&'o Operation<'a>> {
 fn writes_as_mlir_translate() {
     let opt = MlirOpt::upstream();
     let filter = std::env::var("FILTER").ok();
-    let mut stems: Vec<String> = fs::read_dir(dir()).unwrap().filter_map(|e| e.ok()?.file_name().into_string().ok()?.strip_suffix(".spv").map(str::to_owned)).collect();
+    let mut stems: Vec<String> = fs::read_dir(dir()).unwrap().filter_map(|e| e.ok()?.file_name().into_string().ok()?.strip_suffix(".spv").filter(|s| !s.ends_with(".rt")).map(str::to_owned)).collect();
     stems.sort();
     let binaries = Binaries::builtin();
     let (mut exact, mut failed) = (0, Vec::new());
@@ -46,8 +46,8 @@ fn writes_as_mlir_translate() {
         }
     }
     eprintln!("{exact} of {} write byte for byte", exact + failed.len());
-    /// The modules written byte for byte so far; the others use ops and decorations not written yet
-    const FLOOR: usize = 203;
+    /// Every module written byte for byte
+    const FLOOR: usize = 250;
     assert!(filter.is_some() || exact >= FLOOR, "{exact} written byte for byte, fewer than {FLOOR}");
     for f in &failed {
         eprintln!("  {f}");

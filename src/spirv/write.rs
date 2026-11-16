@@ -12,6 +12,7 @@ use mlirformat::spirv_types::{SpirvDecoration, SpirvType};
 use mlirformat::{Attribute, Const, Error, FloatKind, NamedAttr, Scalar, ShapedKind, Signedness, Type};
 
 use super::{Arg, AttrKind, Code, EnumSpec, Group, OpSpec};
+use super::SpirvReader;
 use crate::{BlockId, Format, Ir, OpId, ValueId};
 use mlirformat::Operation;
 
@@ -49,6 +50,7 @@ impl SpirvWriter {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SpirvFormat {
     pub writer: SpirvWriter,
+    pub reader: SpirvReader,
 }
 
 impl SpirvFormat {
@@ -69,7 +71,7 @@ impl Format for SpirvFormat {
     }
 
     fn read(&self, bytes: &[u8]) -> Result<Operation<'static>, Error> {
-        super::read::SpirvReader::read(bytes)
+        self.reader.read(bytes)
     }
 }
 
@@ -350,12 +352,12 @@ impl<'b, 'a> Serializer<'b, 'a> {
                 args.push(Self::enum_value("LinkageType", ltype)?);
             }
             "FPFastMathMode" | "FPRoundingMode" => args.push(EnumSpec::attr_value(attr).ok_or_else(|| Error(format!("expected {name}Attr attribute")))?),
-            "Binding" | "DescriptorSet" | "Location" | "Index" => args.push(Self::int_attr(attr).ok_or_else(|| Error(format!("expected integer attribute for {name}")))? as u32),
+            "Binding" | "DescriptorSet" | "Location" | "Index" | "Offset" | "XfbBuffer" | "XfbStride" => args.push(Self::int_attr(attr).ok_or_else(|| Error(format!("expected integer attribute for {name}")))? as u32),
             "BuiltIn" => {
                 let Attribute::Str { lit, .. } = attr else { return err("expected string attribute for BuiltIn") };
                 args.push(Self::enum_value("BuiltIn", lit)?);
             }
-            "Aliased" | "AliasedPointer" | "Flat" | "NonReadable" | "NonWritable" | "NoPerspective" | "NoSignedWrap" | "NoUnsignedWrap" | "RelaxedPrecision" | "Restrict" | "RestrictPointer" | "NoContraction" | "Constant" | "Block" | "Invariant" | "Patch" | "Coherent" => {
+            "Aliased" | "AliasedPointer" | "Flat" | "NonReadable" | "NonWritable" | "NoPerspective" | "NoSignedWrap" | "NoUnsignedWrap" | "RelaxedPrecision" | "Restrict" | "RestrictPointer" | "NoContraction" | "Constant" | "Block" | "BufferBlock" | "Invariant" | "Patch" | "Coherent" => {
                 let ok = matches!(attr, Attribute::Unit) || matches!(attr, Attribute::Extended { ext, .. } if ext.name == "spirv.decoration");
                 if !ok {
                     return err(format!("expected unit attribute or decoration attribute for {name}"));
@@ -372,6 +374,13 @@ impl<'b, 'a> Serializer<'b, 'a> {
                     let control = Self::enum_value(class, field_of(field).unwrap_or(""))?;
                     self.emit_decoration(id, deco, &[level, control]);
                 }
+                return Ok(());
+            }
+            "AlignmentId" | "MaxByteOffsetId" | "CounterBuffer" => {
+                let Attribute::SymbolRef(p) = attr else { return err(format!("expected symbol reference for {name}")) };
+                let sym = p.first().map(|x| String::from(x.trim_matches('"'))).unwrap_or_default();
+                let operand = self.global_var_ids.get(&sym).or_else(|| self.spec_const_ids.get(&sym)).copied().ok_or_else(|| Error(format!("could not find <id> for symbol '{sym}' referenced by {name}")))?;
+                Self::encode(&mut self.decorations, "OpDecorateId", &[id, deco, operand]);
                 return Ok(());
             }
             _ => return err(format!("unhandled decoration {name}")),
@@ -477,8 +486,14 @@ impl<'b, 'a> Serializer<'b, 'a> {
             }
             Type::Float(k) => {
                 ops.push(t.bit_width().ok_or_else(|| Error(format!("unhandled type in serialization: {t}")))?);
-                if *k == FloatKind::BF16 {
-                    ops.push(Self::enum_value("FPEncoding", "BFloat16KHR")?);
+                let encoding = match k {
+                    FloatKind::BF16 => Some("BFloat16KHR"),
+                    FloatKind::F8E4M3FN => Some("Float8E4M3EXT"),
+                    FloatKind::F8E5M2 => Some("Float8E5M2EXT"),
+                    _ => None,
+                };
+                if let Some(e) = encoding {
+                    ops.push(Self::enum_value("FPEncoding", e)?);
                 }
                 "OpTypeFloat"
             }
@@ -528,7 +543,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
                     _ => pointee_id = self.type_in(&pointee, ctx)?,
                 }
                 ops.extend([sc, pointee_id]);
-                let block = |decos: &[SpirvDecoration]| decos.iter().any(|d| d.name == "Block");
+                let block = |decos: &[SpirvDecoration]| decos.iter().any(|d| d.name == "Block" || d.name == "BufferBlock");
                 if let Some((name, members, decos)) = &pointee_struct
                     && matches!(&*storage, "PhysicalStorageBuffer" | "PushConstant" | "StorageBuffer" | "Uniform")
                     && !match (name, members) {
@@ -654,6 +669,12 @@ impl<'b, 'a> Serializer<'b, 'a> {
         let id = match value {
             Attribute::Array(elems) => self.array_const(ty, elems)?,
             a => {
+                let typed = match a {
+                    Attribute::Int { lit, ty: None } => Attribute::Int { lit: lit.clone(), ty: Some(ty.clone()) },
+                    Attribute::Float { lit, ty: None } => Attribute::Float { lit: lit.clone(), ty: Some(ty.clone()) },
+                    a => a.clone(),
+                };
+                let a = &typed;
                 let c = Self::dense(a).ok_or_else(|| Error(format!("cannot serialize attribute: {a}")))?;
                 let rank = c.ty.shape().map_or(0, |s| s.len());
                 self.dense_const(ty, &c, 0, &mut vec![0; rank])?
@@ -681,9 +702,12 @@ impl<'b, 'a> Serializer<'b, 'a> {
         let tid = self.type_id(ty)?;
         let id = self.next();
         let mut ops = vec![tid, id];
-        let elem = Self::composite_element(ty)?;
-        for e in elems {
-            ops.push(self.constant(&elem, e)?);
+        let members: Vec<Type<'static>> = match SpirvType::try_from(ty) {
+            Ok(SpirvType::Struct { members: Some(ms), .. }) => ms.into_iter().map(|m| m.ty.owned()).collect(),
+            _ => vec![Self::composite_element(ty)?; elems.len()],
+        };
+        for (e, t) in elems.iter().zip(&members) {
+            ops.push(self.constant(t, e)?);
         }
         Self::encode(&mut self.types_globals, "OpConstantComposite", &ops);
         Ok(id)
@@ -798,7 +822,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
 
     fn const_float(&mut self, ty: Type<'_>, bits: u64, spec: bool) -> Result<u32, Error> {
         let words = match ty {
-            Type::Float(FloatKind::F32 | FloatKind::F16 | FloatKind::BF16) => Words::One(bits as u32),
+            Type::Float(FloatKind::F32 | FloatKind::F16 | FloatKind::BF16 | FloatKind::F8E4M3FN | FloatKind::F8E5M2) => Words::One(bits as u32),
             Type::Float(FloatKind::F64) => Words::Two(bits),
             t => return err(format!("cannot serialize {t}-typed float literal")),
         };
@@ -1008,6 +1032,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
             return match name {
                 "spirv.EntryPoint" => self.entry_point(op),
                 "spirv.ExecutionMode" => self.execution_mode(op),
+                "spirv.ExecutionModeId" => self.execution_mode_id(op),
                 "spirv.FunctionCall" => self.function_call(op),
                 "spirv.CopyMemory" => self.copy_memory(op),
                 "spirv.GenericCastToPtrExplicit" => self.generic_cast_to_ptr_explicit(op),
@@ -1052,7 +1077,13 @@ impl<'b, 'a> Serializer<'b, 'a> {
                                 let Attribute::Type(t) = attr else { return err(format!("bad type {n}")) };
                                 ops.push(self.type_id(&t.clone())?);
                             }
-                            None => return err(format!("unhandled attribute {n}")),
+                            None => {
+                                let ty = match attr {
+                                    Attribute::Builtin { ty: Some(t), .. } => t.clone(),
+                                    a => Self::value_type(a).ok_or_else(|| Error(format!("unhandled attribute {n}")))?,
+                                };
+                                ops.push(self.constant(&ty, attr)?);
+                            }
                         }
                     }
                     elided.push(n);
@@ -1184,6 +1215,22 @@ impl<'b, 'a> Serializer<'b, 'a> {
             ops.extend(vs.iter().filter_map(Self::int_attr).map(|v| v as u32));
         }
         Self::encode(&mut self.execution_modes, "OpExecutionMode", &ops);
+        Ok(())
+    }
+
+    /// `OpExecutionModeId`: its values are spec constants, written as their <id>s
+    fn execution_mode_id(&mut self, op: OpId) -> Result<(), Error> {
+        let f = self.symbol(op, "fn")?;
+        let fid = self.func_ids.get(&f).copied().ok_or_else(|| Error(format!("missing <id> for function {f}; function needs to be serialized before ExecutionModeIdOp is serialized")))?;
+        let mut ops = vec![fid, self.enum_attr(op, "execution_mode")?];
+        if let Some(Attribute::Array(vs)) = self.attr(op, "values") {
+            for v in vs {
+                let Attribute::SymbolRef(p) = v else { return err("expected a spec constant symbol") };
+                let sym = p.first().map(|x| String::from(x.trim_matches('"'))).unwrap_or_default();
+                ops.push(self.spec_const_ids.get(&sym).copied().ok_or_else(|| Error(format!("unknown <id> for specialization constant {sym}")))?);
+            }
+        }
+        Self::encode(&mut self.execution_modes, "OpExecutionModeId", &ops);
         Ok(())
     }
 
