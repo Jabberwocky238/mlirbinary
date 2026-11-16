@@ -46,6 +46,9 @@ fn writes_as_mlir_translate() {
         }
     }
     eprintln!("{exact} of {} write byte for byte", exact + failed.len());
+    /// The modules written byte for byte so far; the others use ops and decorations not written yet
+    const FLOOR: usize = 203;
+    assert!(filter.is_some() || exact >= FLOOR, "{exact} written byte for byte, fewer than {FLOOR}");
     for f in &failed {
         eprintln!("  {f}");
     }

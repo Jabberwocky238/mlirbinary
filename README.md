@@ -29,9 +29,19 @@ Nothing is global: a program's formats are the ones it loads.
 
 ## SPIR-V
 
-`SpirvFormat` (feature `spirv`, default) writes a `spirv.module` as `mlir-translate --serialize-spirv`
-(LLVM 23.1.5) does: 196 of MLIR's 250 `Target/SPIRV` test modules come out byte for byte
-(`cargo test --test write`; the others use ops and decorations not written yet). Reading is in progress.
+`SpirvFormat` (feature `spirv`, default) reads and writes SPIR-V as `mlir-translate` (LLVM 23.1.5) does,
+checked against MLIR's own 250 `Target/SPIRV` test modules:
+
+- reading (`--deserialize-spirv`): all 250 come out as `mlir-translate` makes them — structured
+  control flow rebuilt from the merge instructions, OpPhi as block arguments, constants
+  materialized at their uses, identified and recursive structs, spec constants and their
+  operations, ARM tensors and graphs (`cargo test --test read`; the text compared is the generic
+  form with SSA names renumbered);
+- writing (`--serialize-spirv`): 203 of 250 byte for byte (`cargo test --test write`; the others use
+  ops and decorations not written yet).
+
+The grammar tables (`src/spirv/tables.gen.rs`) are generated from the SPIR-V dialect's ODS by
+`scripts/spirv_tables.py`.
 
 `Ir` is the read-only index the formats work on: every op, value, block and region of an mlirformat
 op tree numbered, operands and successors resolved by name.

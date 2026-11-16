@@ -26,7 +26,12 @@ pub trait Format: Send + Sync {
 
 ## SPIR-V
 
-`SpirvFormat`（feature `spirv`，缺省开）按 `mlir-translate --serialize-spirv`（LLVM 23.1.5）的方式写 `spirv.module`：MLIR 自己的 250 个 `Target/SPIRV` 测试模块里 196 个逐字节一致（`cargo test --test write`；其余用到的 op 和修饰还没写）。读入正在做。
+`SpirvFormat`（feature `spirv`，缺省开）按 `mlir-translate`（LLVM 23.1.5）的方式读写 SPIR-V，用 MLIR 自己的 250 个 `Target/SPIRV` 测试模块对拍：
+
+- 读入（`--deserialize-spirv`）：250 个全部与 `mlir-translate` 的结果一致——按 merge 指令还原结构化控制流、OpPhi 变块参数、常量在使用处物化、具名与递归结构体、特化常量及其运算、ARM 张量与 graph（`cargo test --test read`；比较的是通用形式文本，SSA 名重新编号）；
+- 写入（`--serialize-spirv`）：250 个里 203 个逐字节一致（`cargo test --test write`；其余用到的 op 和修饰还没写）。
+
+指令表 `src/spirv/tables.gen.rs` 由 `scripts/spirv_tables.py` 从 SPIR-V 方言的 ODS 生成。
 
 `Ir` 是各格式共用的只读索引：mlirformat op 树里每个 op、值、块、区域编号，操作数和后继按名字解析好。
 

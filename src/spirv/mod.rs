@@ -6,6 +6,7 @@ mod write;
 #[path = "tables.gen.rs"]
 mod tables;
 
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use mlirformat::Attribute;
@@ -57,6 +58,22 @@ impl EnumSpec<'_> {
         } else {
             self.cases.iter().filter(|c| c.value == value).take(1).collect()
         }
+    }
+
+    /// `value` as MLIR prints this enum: its case, or for a bit enum its cases joined by `|`
+    /// (`None` when no bit is set)
+    pub fn text(&self, value: u32) -> Option<String> {
+        if self.bits && value == 0 {
+            return self.cases.iter().find(|c| c.value == 0).map(|c| String::from(c.name));
+        }
+        let cases = self.cases_of(value);
+        let covered = cases.iter().fold(0, |acc, c| acc | c.value);
+        (!cases.is_empty() && (!self.bits || covered == value)).then(|| cases.iter().map(|c| c.name).collect::<Vec<_>>().join("|"))
+    }
+
+    /// The `#spirv.<mnemonic>` attribute that carries enum `class`
+    pub fn mnemonic(class: &str) -> Option<&'static str> {
+        tables::ENUM_ATTRS.iter().find(|(_, c)| *c == class).map(|(m, _)| *m)
     }
 
     pub fn opcode(name: &str) -> u32 {
@@ -112,6 +129,16 @@ pub struct OpSpec<'t> {
 }
 
 impl OpSpec<'_> {
+    /// The op an opcode stands for
+    pub fn code(op: u32) -> Option<&'static OpSpec<'static>> {
+        tables::OPS.iter().find(|o| matches!(o.code, Code::Op(c) if c == op))
+    }
+
+    /// The op of an extended instruction set's instruction
+    pub fn ext(set: &str, n: u32) -> Option<&'static OpSpec<'static>> {
+        tables::OPS.iter().find(|o| matches!(o.code, Code::Ext(s, c) if s == set && c == n))
+    }
+
     pub fn of(name: &str) -> Option<&OpSpec<'_>> {
         tables::OPS.binary_search_by(|o| o.name.cmp(name)).ok().map(|i| &tables::OPS[i]).or_else(|| OpSpec::GRAPHICS.iter().find(|o| o.name == name))
     }

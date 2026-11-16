@@ -487,7 +487,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
                 ops.extend([elem, t.element_count().unwrap_or(0) as u32]);
                 "OpTypeVector"
             }
-            t => return self.prepare_spirv_type(t, id, ops, ctx).map(|o| o),
+            t => return self.prepare_spirv_type(t, id, ops, ctx),
         };
         Ok(Some(op))
     }
@@ -697,7 +697,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
     }
 
     fn dense_const(&mut self, ty: &Type<'_>, c: &Const<'_>, dim: usize, index: &mut Vec<usize>) -> Result<u32, Error> {
-        let shape: Vec<i64> = c.ty.shape().map(|s| s.iter().map(|d| i64::from(d)).collect()).unwrap_or_default();
+        let shape: Vec<i64> = c.ty.shape().map(|s| s.iter().map(i64::from).collect()).unwrap_or_default();
         if dim == shape.len() {
             let flat = index.iter().zip(&shape).fold(0usize, |acc, (i, n)| acc * *n as usize + i);
             let elem = c.ty.element_type().owned();
@@ -872,7 +872,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
 
     fn operation(&mut self, op: OpId) -> Result<(), Error> {
         let name = self.body[op].name;
-        match &*name {
+        match name {
             "spirv.mlir.addressof" => {
                 let var = self.symbol(op, "variable")?;
                 let id = self.global_var_ids.get(&var).copied().ok_or_else(|| Error(format!("unknown result <id> for variable {var}")))?;
@@ -1003,9 +1003,9 @@ impl<'b, 'a> Serializer<'b, 'a> {
 
     fn autogen(&mut self, op: OpId) -> Result<(), Error> {
         let name = self.body[op].name;
-        let spec = OpSpec::of(&name).ok_or_else(|| Error(format!("'{name}' unhandled operation serialization")))?;
+        let spec = OpSpec::of(name).ok_or_else(|| Error(format!("'{name}' unhandled operation serialization")))?;
         if !spec.autogen {
-            return match &*name {
+            return match name {
                 "spirv.EntryPoint" => self.entry_point(op),
                 "spirv.ExecutionMode" => self.execution_mode(op),
                 "spirv.FunctionCall" => self.function_call(op),
@@ -1031,7 +1031,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
         for a in spec.args {
             match a {
                 Arg::Operands(g) => {
-                    for v in self.body[op].operands[groups[*g as usize].clone()].to_vec() {
+                    for v in self.body[op].operands[groups[*g as usize].clone()].iter().copied() {
                         ops.push(self.value_id(v));
                     }
                 }
@@ -1082,7 +1082,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
                 let fixed = groups.iter().filter(|g| **g == Group::One).count();
                 let variable = groups.len() - fixed;
                 let rest = n.saturating_sub(fixed);
-                groups.iter().map(|g| if *g == Group::One { 1 } else if variable > 0 { rest / variable } else { 0 }).collect()
+                groups.iter().map(|g| if *g == Group::One { 1 } else { rest.checked_div(variable).unwrap_or(0) }).collect()
             }
         };
         let mut at = 0;
@@ -1484,7 +1484,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
     }
 
     fn merge_block(&self, op: OpId) -> Option<BlockId> {
-        matches!(&*self.body[op].name, "spirv.mlir.loop" | "spirv.mlir.selection").then(|| *self.body[self.body[op].regions[0]].blocks.last().expect("merge block"))
+        matches!(self.body[op].name, "spirv.mlir.loop" | "spirv.mlir.selection").then(|| *self.body[self.body[op].regions[0]].blocks.last().expect("merge block"))
     }
 
     fn phi_incoming(&self, b: BlockId) -> BlockId {
@@ -1520,7 +1520,7 @@ impl<'b, 'a> Serializer<'b, 'a> {
         }
         let mut preds = Vec::new();
         for t in self.predecessors(b) {
-            if !matches!(&*self.body[t].name, "spirv.Branch" | "spirv.BranchConditional" | "spirv.Switch") {
+            if !matches!(self.body[t].name, "spirv.Branch" | "spirv.BranchConditional" | "spirv.Switch") {
                 return err(format!("'{}' unimplemented terminator for Phi creation", self.body[t].name));
             }
             let from = self.body[t].parent.expect("placed");
