@@ -40,20 +40,20 @@ run on the calling thread. A reader or writer sees the pool as `&dyn Pool`.
 `SpirvReader` and `SpirvWriter` read and write SPIR-V as `mlir-translate` (LLVM 23.1.5) does,
 checked against MLIR's own 250 `Target/SPIRV` test modules, all of them:
 
-- reading (`--deserialize-spirv`, `cargo test --test read`): structured control flow rebuilt from
+- reading (`--deserialize-spirv`, `cargo test --test spirv read`): structured control flow rebuilt from
   the merge instructions, OpPhi as block arguments, constants materialized at their uses,
   identified and recursive structs, spec constants and their operations, ARM tensors and graphs;
   the text compared is the generic form with SSA names renumbered. `SpirvReader { structurize:
   false }` is `--spirv-structurize-control-flow=false`: blocks stay a plain graph, which also reads
-  what structurization cannot, such as a loop left early (`tests/fixtures/spirv-unstructured`);
-- writing (`--serialize-spirv`, `cargo test --test write`): byte for byte;
-- reading then writing (`cargo test --test roundtrip`): byte for byte what `mlir-translate`
+  what structurization cannot, such as a loop left early (`tests/spirv/fixtures/unstructured`);
+- writing (`--serialize-spirv`, `cargo test --test spirv write`): byte for byte;
+- reading then writing (`cargo test --test spirv roundtrip`): byte for byte what `mlir-translate`
   writes for the module it reads.
 
 `SpirvGlsl` (`"spirv-glsl"`, `Write`) writes a `spirv.module` as GLSL 4.50 source for Vulkan, as far as
 GLSL can say what it does (it says why where it cannot); `SpirvGlsl::stage` is the entry point's stage.
-Its output for each test module is kept beside it (`tests/fixtures/spirv/*.glsl`, `cargo test --test
-spirv_glsl`); mlirpass compiles what it writes with glslang and runs it on Vulkan.
+Its output for each test module is kept beside it (`tests/spirv/fixtures/modules/*.glsl`, `cargo test --test
+spirv glsl`); mlirpass compiles what it writes with glslang and runs it on Vulkan.
 
 The grammar tables (`src/types/spirv/tables.gen.rs`) are generated from the SPIR-V dialect's ODS by
 `scripts/spirv_tables.py`.
@@ -62,7 +62,7 @@ The grammar tables (`src/types/spirv/tables.gen.rs`) are generated from the SPIR
 
 `BytecodeFormat` (`"mlirbc"`, both `Read` and `Write`) reads and writes MLIR's own binary form,
 the bytecode `mlir-opt --emit-bytecode` (23.1.5) writes, version 6. Checked against `mlir-opt` on
-one module of each upstream test file (2269, `tests/fixtures/mlirbc`, made by
+one module of each upstream test file (2269, `tests/bytecode/fixtures`, made by
 `scripts/mlirbc_fixtures.py`; `cargo test --test bytecode`):
 
 - writing: 2243 byte for byte, numbered as `mlir-opt` numbers (attributes, types and op names by
@@ -84,7 +84,7 @@ lists the ops `mlir-opt` registers. The test dialect, which only `mlir-opt` has,
 its globals, built-ins and texture ops, the rest as `func` / `arith` / `math` / `vector` / `scf` and SPIR-V
 control flow and types — what mlirpass's `convert-glsl-to-spirv` lowers. `GlslFormat::new(Some(stage))`
 names the stage; without one, a source that writes `gl_Position` is a vertex shader. Checked on mlirpass's
-101 test shaders (`tests/fixtures/glsl`, `cargo test --test glsl`): each reads as mlirpass read it before
+101 test shaders (`tests/glsl/fixtures`, `cargo test --test glsl`): each reads as mlirpass read it before
 the reader moved here.
 
 Writing turns a `glsl.shader` back into source: each value a local, loops and branches rebuilt from

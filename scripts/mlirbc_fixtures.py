@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds tests/fixtures/mlirbc: an input chunk printed by mlir-opt in generic form with every
+"""Builds tests/bytecode/fixtures: an input chunk printed by mlir-opt in generic form with every
 location spelled out (`<stem>.in.mlir`) and the bytecode mlir-opt writes for that text
 (`<stem>.mlirbc`). With `--all` every chunk of every input; by default one per input, the first
 whose text and bytecode together fit in MAX_BYTES.

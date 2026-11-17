@@ -5,11 +5,12 @@ use mlirbinary::{GlslFormat, Read};
 use mlirformat::glsl::{GlslDialect, GlslStage};
 use mlirformat::{Item, MlirOpt, Module, Operation};
 
+#[path = "../common/mod.rs"]
 mod common;
 use common::Canon;
 
 fn dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/glsl")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/glsl/fixtures")
 }
 
 fn shader<'o, 'a>(ops: &'o [Operation<'a>]) -> Option<&'o Operation<'a>> {

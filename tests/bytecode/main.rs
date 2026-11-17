@@ -5,7 +5,7 @@ use mlirbinary::{Binaries, BytecodeFormat, Read};
 use mlirformat::{Item, MlirOpt};
 
 fn dir() -> PathBuf {
-    std::env::var_os("MLIRBC_DIR").map_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mlirbc"), PathBuf::from)
+    std::env::var_os("MLIRBC_DIR").map_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/bytecode/fixtures"), PathBuf::from)
 }
 
 /// Every `.mlirbc` here is what `mlir-opt --emit-bytecode` (23.1.5) wrote for the `.in.mlir`

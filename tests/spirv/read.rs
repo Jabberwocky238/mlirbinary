@@ -1,18 +1,15 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use mlirbinary::{Read, SpirvReader};
 use mlirformat::{Item, MlirOpt, Module};
 
-mod common;
-use common::Canon;
+use crate::common::Canon;
 
 /// Names restart at each function
 const SPIRV_FUNC: &str = "\"spirv.func\"";
 
-fn fixtures(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name)
-}
+
 
 /// Every `.read.mlir` in `dir` is what `mlir-translate --deserialize-spirv` (23.1.5) made of the
 /// `.spv` beside it, read here with `reader`.
@@ -53,12 +50,12 @@ fn reads_as_mlir_translate(dir: &Path, reader: SpirvReader) {
 
 #[test]
 fn structured() {
-    reads_as_mlir_translate(&fixtures("spirv"), SpirvReader::default());
+    reads_as_mlir_translate(&crate::fixtures("modules"), SpirvReader::default());
 }
 
 /// `--spirv-structurize-control-flow=false`: loops and selections left as plain blocks, which
 /// also reads what structurization cannot (the GL shader's loops left early)
 #[test]
 fn unstructured() {
-    reads_as_mlir_translate(&fixtures("spirv-unstructured"), SpirvReader { structurize: false });
+    reads_as_mlir_translate(&crate::fixtures("unstructured"), SpirvReader { structurize: false });
 }

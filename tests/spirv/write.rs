@@ -5,7 +5,7 @@ use mlirbinary::{Binaries, Read, SpirvReader};
 use mlirformat::{Item, MlirOpt, Operation};
 
 fn dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/spirv")
+    crate::fixtures("modules")
 }
 
 fn find<'o, 'a>(ops: &'o [Operation<'a>]) -> Option<&'o Operation<'a>> {

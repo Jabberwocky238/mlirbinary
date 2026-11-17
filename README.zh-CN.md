@@ -34,17 +34,17 @@ pub trait Write: Send + Sync {
 
 `SpirvReader` / `SpirvWriter` 按 `mlir-translate`（LLVM 23.1.5）的方式读写 SPIR-V，用 MLIR 自己的 250 个 `Target/SPIRV` 测试模块对拍，全部通过：
 
-- 读入（`--deserialize-spirv`，`cargo test --test read`）：按 merge 指令还原结构化控制流、OpPhi 变块参数、常量在使用处物化、具名与递归结构体、特化常量及其运算、ARM 张量与 graph；比较的是通用形式文本，SSA 名重新编号。`SpirvReader { structurize: false }` 即 `--spirv-structurize-control-flow=false`：块保持平铺的分支图，结构化读不了的（比如循环里提前退出）也能读（`tests/fixtures/spirv-unstructured`）；
-- 写入（`--serialize-spirv`，`cargo test --test write`）：逐字节一致；
-- 读入再写出（`cargo test --test roundtrip`）：与 `mlir-translate` 读入同一模块后写出的结果逐字节一致。
+- 读入（`--deserialize-spirv`，`cargo test --test spirv read`）：按 merge 指令还原结构化控制流、OpPhi 变块参数、常量在使用处物化、具名与递归结构体、特化常量及其运算、ARM 张量与 graph；比较的是通用形式文本，SSA 名重新编号。`SpirvReader { structurize: false }` 即 `--spirv-structurize-control-flow=false`：块保持平铺的分支图，结构化读不了的（比如循环里提前退出）也能读（`tests/spirv/fixtures/unstructured`）；
+- 写入（`--serialize-spirv`，`cargo test --test spirv write`）：逐字节一致；
+- 读入再写出（`cargo test --test spirv roundtrip`）：与 `mlir-translate` 读入同一模块后写出的结果逐字节一致。
 
-`SpirvGlsl`（名字 `"spirv-glsl"`，实现 `Write`）把 `spirv.module` 写成面向 Vulkan 的 GLSL 4.50 源码，GLSL 表达不了的地方报明原因；`SpirvGlsl::stage` 给出入口点的阶段。每个测试模块的输出存在旁边（`tests/fixtures/spirv/*.glsl`，`cargo test --test spirv_glsl`）；mlirpass 用 glslang 编译它写出的源码，并在 Vulkan 上跑。
+`SpirvGlsl`（名字 `"spirv-glsl"`，实现 `Write`）把 `spirv.module` 写成面向 Vulkan 的 GLSL 4.50 源码，GLSL 表达不了的地方报明原因；`SpirvGlsl::stage` 给出入口点的阶段。每个测试模块的输出存在旁边（`tests/spirv/fixtures/modules/*.glsl`，`cargo test --test spirv glsl`）；mlirpass 用 glslang 编译它写出的源码，并在 Vulkan 上跑。
 
 指令表 `src/types/spirv/tables.gen.rs` 由 `scripts/spirv_tables.py` 从 SPIR-V 方言的 ODS 生成。
 
 ## MLIR bytecode
 
-`BytecodeFormat`（名字 `"mlirbc"`，`Read`、`Write` 都实现）读写 MLIR 自己的二进制形式，即 `mlir-opt --emit-bytecode`（23.1.5）写的 bytecode（第 6 版）。对拍取上游每个测试文件一个模块，共 2269 个（`tests/fixtures/mlirbc`，由 `scripts/mlirbc_fixtures.py` 生成；`cargo test --test bytecode`）：
+`BytecodeFormat`（名字 `"mlirbc"`，`Read`、`Write` 都实现）读写 MLIR 自己的二进制形式，即 `mlir-opt --emit-bytecode`（23.1.5）写的 bytecode（第 6 版）。对拍取上游每个测试文件一个模块，共 2269 个（`tests/bytecode/fixtures`，由 `scripts/mlirbc_fixtures.py` 生成；`cargo test --test bytecode`）：
 
 - 写入：2243 个逐字节一致。编号与 `mlir-opt` 相同（属性、类型、op 名按引用次数和方言排、值按区域编号、按使用情况判定隔离区域、按解析器的建表顺序推出 use-list 顺序）；内置属性/类型和 quant 方言的类型用各自的专用编码，其他方言的写成文本；
 - 读入：2245 个读出后打印成通用形式，与 `mlir-opt` 打印的完全一样（含值名）；2243 个读出再写回原样字节；
@@ -54,7 +54,7 @@ pub trait Write: Send + Sync {
 
 ## GLSL
 
-`GlslFormat`（名字 `"glsl"`，`Read`、`Write` 都实现）把 GLSL ES 1.00 / 3.00 源码读成 mlirformat 的 `glsl` 方言：`glsl.shader` 及其全局变量、内置函数和纹理 op，其余是 `func` / `arith` / `math` / `vector` / `scf` 和 SPIR-V 的控制流与类型，正是 mlirpass 的 `convert-glsl-to-spirv` 要降的东西。`GlslFormat::new(Some(stage))` 指定阶段；不指定时，写了 `gl_Position` 的算顶点着色器。用 mlirpass 的 101 个测试着色器对拍（`tests/fixtures/glsl`，`cargo test --test glsl`）：每个读出的结果都和读入搬来之前 mlirpass 读出的一样。
+`GlslFormat`（名字 `"glsl"`，`Read`、`Write` 都实现）把 GLSL ES 1.00 / 3.00 源码读成 mlirformat 的 `glsl` 方言：`glsl.shader` 及其全局变量、内置函数和纹理 op，其余是 `func` / `arith` / `math` / `vector` / `scf` 和 SPIR-V 的控制流与类型，正是 mlirpass 的 `convert-glsl-to-spirv` 要降的东西。`GlslFormat::new(Some(stage))` 指定阶段；不指定时，写了 `gl_Position` 的算顶点着色器。用 mlirpass 的 101 个测试着色器对拍（`tests/glsl/fixtures`，`cargo test --test glsl`）：每个读出的结果都和读入搬来之前 mlirpass 读出的一样。
 
 写出把 `glsl.shader` 还原成源码：每个值落成局部变量，循环和分支按读入留下的结构（选择的 merge 块、循环的块布局）还原，有符号性只在 op 上的值补 `int` / `uint` 转换，显式 location、binding、插值和精度照留。结构体成员、uniform 块要自己起名（`m0`、`S_<哈希>`、`<实例>_Block`），因为方言里没有这些名字。全部测试着色器写出后都能读回（`cargo test --test glsl`）；在 mlirpass 的 `tests/gl.rs` 里，每个读入再写出的着色器在本机 OpenGL 上的渲染都和原始源码逐位一致（Mesa 对源码做了重结合的用例，与 glslang 的 SPIR-V 逐位一致）。
 

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use mlirbinary::Binaries;
 
 fn dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/spirv")
+    crate::fixtures("modules")
 }
 
 /// Each `.spv` read and written again comes out as `mlir-translate --deserialize-spirv |
