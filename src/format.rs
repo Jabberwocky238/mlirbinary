@@ -63,7 +63,7 @@ impl Binaries {
     /// Every format this crate has
     pub fn builtin() -> Self {
         let mut b = Self::new();
-        b.reads(crate::SpirvReader::default()).writes(crate::SpirvWriter::default());
+        b.reads(crate::SpirvReader::default()).writes(crate::SpirvWriter::default()).writes(crate::SpirvGlsl);
         b.reads(crate::BytecodeFormat::default()).writes(crate::BytecodeFormat::default());
         b.reads(crate::GlslFormat::default()).writes(crate::GlslFormat::default());
         b

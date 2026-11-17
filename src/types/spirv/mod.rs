@@ -1,6 +1,7 @@
 //! SPIR-V: the binary `SpirvWriter` writes (`spirv.module` ⇒ words, as `mlir-translate
 //! --serialize-spirv` does) and `SpirvReader` reads back, and the grammar tables both use.
 
+mod glsl;
 mod read;
 mod write;
 #[path = "tables.gen.rs"]
@@ -12,6 +13,7 @@ use alloc::vec::Vec;
 use mlirformat::Attribute;
 
 pub use read::SpirvReader;
+pub use glsl::SpirvGlsl;
 pub use write::SpirvWriter;
 
 pub struct Avail<'t> {

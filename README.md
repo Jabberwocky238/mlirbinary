@@ -50,6 +50,11 @@ checked against MLIR's own 250 `Target/SPIRV` test modules, all of them:
 - reading then writing (`cargo test --test roundtrip`): byte for byte what `mlir-translate`
   writes for the module it reads.
 
+`SpirvGlsl` (`"spirv-glsl"`, `Write`) writes a `spirv.module` as GLSL 4.50 source for Vulkan, as far as
+GLSL can say what it does (it says why where it cannot); `SpirvGlsl::stage` is the entry point's stage.
+Its output for each test module is kept beside it (`tests/fixtures/spirv/*.glsl`, `cargo test --test
+spirv_glsl`); mlirpass compiles what it writes with glslang and runs it on Vulkan.
+
 The grammar tables (`src/types/spirv/tables.gen.rs`) are generated from the SPIR-V dialect's ODS by
 `scripts/spirv_tables.py`.
 

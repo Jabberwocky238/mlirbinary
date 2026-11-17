@@ -38,6 +38,8 @@ pub trait Write: Send + Sync {
 - 写入（`--serialize-spirv`，`cargo test --test write`）：逐字节一致；
 - 读入再写出（`cargo test --test roundtrip`）：与 `mlir-translate` 读入同一模块后写出的结果逐字节一致。
 
+`SpirvGlsl`（名字 `"spirv-glsl"`，实现 `Write`）把 `spirv.module` 写成面向 Vulkan 的 GLSL 4.50 源码，GLSL 表达不了的地方报明原因；`SpirvGlsl::stage` 给出入口点的阶段。每个测试模块的输出存在旁边（`tests/fixtures/spirv/*.glsl`，`cargo test --test spirv_glsl`）；mlirpass 用 glslang 编译它写出的源码，并在 Vulkan 上跑。
+
 指令表 `src/types/spirv/tables.gen.rs` 由 `scripts/spirv_tables.py` 从 SPIR-V 方言的 ODS 生成。
 
 ## MLIR bytecode
