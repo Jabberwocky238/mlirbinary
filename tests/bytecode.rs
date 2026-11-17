@@ -58,16 +58,16 @@ fn reads_as_mlir_opt() {
     let filter = std::env::var("FILTER").ok();
     let mut stems: Vec<String> = fs::read_dir(dir()).unwrap().filter_map(|e| e.ok()?.file_name().into_string().ok()?.strip_suffix(".mlirbc").map(str::to_owned)).collect();
     stems.sort();
-    let format = BytecodeFormat::default();
+    let binaries = Binaries::builtin();
     let (mut exact, mut round, mut failed) = (0, 0, Vec::new());
     for stem in stems.iter().filter(|s| filter.as_deref().is_none_or(|f| s.contains(f))) {
         let bytes = fs::read(dir().join(format!("{stem}.mlirbc"))).unwrap();
         let text = fs::read_to_string(dir().join(format!("{stem}.in.mlir"))).unwrap();
         let want = plain.show(&opt.parse(&text).unwrap()).to_string();
-        let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| format.read(&bytes))).map_err(|_| String::from("panicked")).and_then(|r| r.map_err(|e| e.0));
+        let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| binaries.read(&bytes))).map_err(|_| String::from("panicked")).and_then(|r| r.map_err(|e| e.0));
         match got {
             Ok(op) => {
-                if format.write(&op).is_ok_and(|b| b == bytes) {
+                if binaries.write("mlirbc", &op).is_ok_and(|b| b == bytes) {
                     round += 1;
                 }
                 let got = plain.show(&mlirformat::Module { items: vec![Item::Op(op)] }).to_string();

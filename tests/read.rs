@@ -4,45 +4,14 @@ use std::path::{Path, PathBuf};
 use mlirbinary::{Format, SpirvFormat, SpirvReader};
 use mlirformat::{Item, MlirOpt, Module};
 
+mod common;
+use common::Canon;
+
+/// Names restart at each function
+const SPIRV_FUNC: &str = "\"spirv.func\"";
+
 fn fixtures(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name)
-}
-
-/// Generic text with SSA names and block labels renumbered in order of appearance
-struct Canon;
-
-impl Canon {
-    fn of(module: &Module<'_>) -> String {
-        let text = MlirOpt::default().show(module).to_string();
-        let mut names: Vec<String> = Vec::new();
-        let mut out = String::new();
-        let b = text.as_bytes();
-        let mut i = 0;
-        while i < b.len() {
-            let c = b[i] as char;
-            if text[i..].starts_with("\"spirv.func\"") {
-                names.clear();
-            }
-            let sigil = c == '%';
-            if sigil && !(i > 0 && (b[i - 1] as char).is_ascii_alphanumeric()) {
-                let mut j = i + 1;
-                while j < b.len() && ((b[j] as char).is_ascii_alphanumeric() || b[j] == b'_' || b[j] == b'.' || b[j] == b'$' || b[j] == b'-') {
-                    j += 1;
-                }
-                let tok = String::from(&text[i..j]);
-                let k = names.iter().position(|n| *n == tok).unwrap_or_else(|| {
-                    names.push(tok.clone());
-                    names.len() - 1
-                });
-                out.push_str(&format!("{c}{k}"));
-                i = j;
-            } else {
-                out.push(c);
-                i += 1;
-            }
-        }
-        out
-    }
 }
 
 /// Every `.read.mlir` in `dir` is what `mlir-translate --deserialize-spirv` (23.1.5) made of the
@@ -58,8 +27,8 @@ fn reads_as_mlir_translate(dir: &Path, reader: SpirvReader) {
         let bytes = fs::read(dir.join(format!("{stem}.spv"))).unwrap();
         assert!(SpirvFormat::default().recognizes(&bytes));
         let text = fs::read_to_string(dir.join(format!("{stem}.read.mlir"))).unwrap();
-        let want = Canon::of(&opt.parse(&text).unwrap());
-        let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reader.read(&bytes))).map_err(|_| String::from("panicked")).and_then(|r| r.map_err(|e| e.0)).map(|op| Canon::of(&Module { items: vec![Item::Op(op)] }));
+        let want = Canon::of(&opt.parse(&text).unwrap(), SPIRV_FUNC);
+        let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reader.read(&bytes))).map_err(|_| String::from("panicked")).and_then(|r| r.map_err(|e| e.0)).map(|op| Canon::of(&Module { items: vec![Item::Op(op)] }, SPIRV_FUNC));
         match got {
             Ok(got) if got == want => exact += 1,
             Ok(got) => {

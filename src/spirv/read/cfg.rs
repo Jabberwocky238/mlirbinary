@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use mlirformat::{Attribute, Error, Type};
 
-use super::tree::{At, B, Mapping, O, V};
+use crate::tree::{At, B, Mapping, O, V};
 use super::{Merge, Reader};
 
 /// Terminators the structurizer and the phi wiring know

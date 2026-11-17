@@ -13,7 +13,7 @@ use mlirformat::{Attribute, Const, Error, FloatKind, NamedAttr, Scalar, ShapedKi
 
 use super::{Arg, AttrKind, Code, EnumSpec, Group, OpSpec};
 use super::SpirvReader;
-use crate::{BlockId, Format, Ir, OpId, ValueId};
+use crate::{BlockId, Format, Ir, OpId, Pool, ValueId};
 use mlirformat::Operation;
 
 /// How a `spirv.module` is written: `mlir-translate --serialize-spirv`'s options
@@ -66,11 +66,11 @@ impl Format for SpirvFormat {
         bytes.get(..4).is_some_and(|m| u32::from_le_bytes([m[0], m[1], m[2], m[3]]) == SpirvFormat::MAGIC)
     }
 
-    fn write(&self, op: &Operation<'_>) -> Result<Vec<u8>, Error> {
+    fn write(&self, op: &Operation<'_>, _pool: &dyn Pool) -> Result<Vec<u8>, Error> {
         Ok(SpirvWriter::bytes(&self.writer.words(op)?))
     }
 
-    fn read(&self, bytes: &[u8]) -> Result<Operation<'static>, Error> {
+    fn read(&self, bytes: &[u8], _pool: &dyn Pool) -> Result<Operation<'static>, Error> {
         self.reader.read(bytes)
     }
 }

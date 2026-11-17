@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 
 use mlirformat::{Error, OpInfos, Operation};
 
-use crate::Format;
+use crate::{Format, Pool};
 
 /// How a property of an op is written, as its `writeProperties` does
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -90,11 +90,11 @@ impl Format for BytecodeFormat {
         bytes.starts_with(MAGIC)
     }
 
-    fn write(&self, op: &Operation<'_>) -> Result<Vec<u8>, Error> {
+    fn write(&self, op: &Operation<'_>, _pool: &dyn Pool) -> Result<Vec<u8>, Error> {
         write::Writer::new(op, &self.infos)?.write(&self.producer)
     }
 
-    fn read(&self, bytes: &[u8]) -> Result<Operation<'static>, Error> {
+    fn read(&self, bytes: &[u8], _pool: &dyn Pool) -> Result<Operation<'static>, Error> {
         read::Reader::new(bytes)?.read()
     }
 }

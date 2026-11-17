@@ -1,5 +1,4 @@
 mod cfg;
-mod tree;
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
@@ -12,7 +11,7 @@ use mlirformat::spirv_types::{SpirvDecoration, SpirvMember, SpirvType};
 use mlirformat::{ApFloat, ApInt, Attribute, Const, Error, FloatKind, FunctionType, OpInfos, Operation, Scalar, Signedness, Type};
 
 use super::{Arg, AttrKind, EnumSpec, Group, OpSpec};
-use tree::{At, B, O, Tree, V};
+use crate::tree::{At, B, O, Tree, V};
 
 /// SPIR-V words ⇒ a `spirv.module` in generic form, as `mlir-translate --deserialize-spirv`
 /// (LLVM 23.1.5) builds it

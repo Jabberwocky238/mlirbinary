@@ -91,6 +91,8 @@ pub struct Tree {
 
 impl Tree {
     const SEGMENTS: &'static str = "operandSegmentSizes";
+    /// A switch's case operands, case by case, after its default's
+    const CASE_SEGMENTS: &'static str = "case_operand_segments";
 
     pub fn new() -> Self {
         Self { nodes: Vec::new(), types: Vec::new(), blocks: Vec::new(), regions: Vec::new(), at: None }
@@ -157,7 +159,7 @@ impl Tree {
         v
     }
 
-    fn region(&mut self, parent: O) -> R {
+    pub fn new_region(&mut self, parent: O) -> R {
         self.regions.push(Reg { blocks: Vec::new(), parent: Some(parent) });
         R(self.regions.len() as u32 - 1)
     }
@@ -168,7 +170,7 @@ impl Tree {
         self.nodes.push(Node { name: String::from(name), operands: operands.to_vec(), results, attrs, succ: succ.to_vec(), regions: Vec::new(), parent: None });
         let o = O(self.nodes.len() as u32 - 1);
         for _ in 0..regions {
-            let r = self.region(o);
+            let r = self.new_region(o);
             self.node_mut(o).regions.push(r);
         }
         if let Some(at) = self.at {
@@ -331,7 +333,7 @@ impl Tree {
             Some(Attribute::DenseArray { values, .. }) => values.iter().map(|v| v.parse().unwrap_or(0)).collect::<Vec<usize>>(),
             _ => return 0..n.operands.len(),
         };
-        let cases = match n.get(Reader::CASE_SEGMENTS) {
+        let cases = match n.get(Tree::CASE_SEGMENTS) {
             Some(Attribute::DenseArray { values, .. }) => Some(values.iter().map(|v| v.parse().unwrap_or(0)).collect::<Vec<usize>>()),
             _ => None,
         };
@@ -401,7 +403,6 @@ impl Tree {
     }
 }
 
-use super::Reader;
 
 impl Default for Tree {
     fn default() -> Self {

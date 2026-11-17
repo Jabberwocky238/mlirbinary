@@ -1,0 +1,53 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use mlirbinary::{Format, GlslFormat};
+use mlirformat::glsl::{GlslDialect, GlslStage};
+use mlirformat::{Item, MlirOpt, Module, Operation};
+
+mod common;
+use common::Canon;
+
+fn dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/glsl")
+}
+
+fn shader<'o, 'a>(ops: &'o [Operation<'a>]) -> Option<&'o Operation<'a>> {
+    ops.iter().find_map(|o| if o.name == "glsl.shader" { Some(o) } else { o.regions.iter().flat_map(|r| &r.blocks).find_map(|b| shader(&b.ops)) })
+}
+
+/// Each shader (`<case>.<file>.vert` / `.frag`, from mlirpass's `tests/gl`) reads as the `.mlir`
+/// beside it holds
+#[test]
+fn reads_shaders() {
+    let mut opt = MlirOpt::upstream();
+    opt.load(GlslDialect);
+    let filter = std::env::var("FILTER").ok();
+    let mut names: Vec<String> = fs::read_dir(dir()).unwrap().filter_map(|e| e.ok()?.file_name().into_string().ok()).filter(|n| n.ends_with(".vert") || n.ends_with(".frag")).collect();
+    names.sort();
+    let (mut exact, mut failed) = (0, Vec::new());
+    for name in names.iter().filter(|s| filter.as_deref().is_none_or(|f| s.contains(f))) {
+        let src = fs::read(dir().join(name)).unwrap();
+        let text = fs::read_to_string(dir().join(format!("{name}.mlir"))).unwrap();
+        let m = opt.parse(&text).unwrap();
+        let ops: Vec<Operation<'_>> = m.items.into_iter().filter_map(|i| if let Item::Op(o) = i { Some(o) } else { None }).collect();
+        let want = Canon::of(&Module { items: vec![Item::Op(shader(&ops).unwrap().clone())] }, "");
+        let stage = if name.ends_with(".vert") { GlslStage::Vertex } else { GlslStage::Fragment };
+        let format = GlslFormat::new(Some(stage));
+        assert!(format.recognizes(&src) || !String::from_utf8_lossy(&src).contains("#version"), "{name}");
+        let got = format.read(&src, &moremath::ThreadSingle).map_err(|e| e.0).map(|op| Canon::of(&Module { items: vec![Item::Op(op)] }, ""));
+        match got {
+            Ok(got) if got == want => exact += 1,
+            Ok(got) => {
+                let line = got.lines().zip(want.lines()).position(|(a, b)| a != b).unwrap_or(0);
+                failed.push(format!("{name}: line {}: mlirbinary `{}` / mlirpass `{}`", line + 1, got.lines().nth(line).unwrap_or("").trim(), want.lines().nth(line).unwrap_or("").trim()));
+            }
+            Err(e) => failed.push(format!("{name}: {e}")),
+        }
+    }
+    eprintln!("{exact} of {} read as mlirpass read them", exact + failed.len());
+    for f in &failed {
+        eprintln!("  {}", &f[..f.len().min(400)]);
+    }
+    assert!(failed.is_empty());
+}
