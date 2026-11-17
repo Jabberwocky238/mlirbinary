@@ -3,25 +3,29 @@
 [中文](README.zh-CN.md)
 
 Binary (and source) formats of MLIR modules in Rust: an op tree of [mlirformat](https://github.com/Jabberwocky238/mlirformat)
-written as bytes and read back. Each format is a plugin: a type implementing `Format`, loaded into a
-`Binaries` the way a dialect is loaded into mlirformat's `MlirOpt`; a crate outside this one adds its
-own format (a GPU's machine code, say) without changing mlirbinary.
+written as bytes and read back. Each format is a plugin: a reader implementing `Read`, a writer implementing `Write` (a
+format may have only one), loaded into a `Binaries` the way a dialect is loaded into mlirformat's
+`MlirOpt`; a crate outside this one adds its own (a GPU's machine code, say) without changing mlirbinary.
 
 ```rust
-use mlirbinary::{Binaries, Format};
+use mlirbinary::Binaries;
 
-let mut binaries = Binaries::builtin();       // the formats this crate has (SPIR-V, MLIR bytecode, GLSL)
-binaries.load(MyGpuFormat);                   // and one from another crate
+let mut binaries = Binaries::builtin();       // the formats this crate reads and writes
+binaries.reads(MyGpuReader).writes(MyGpuWriter); // and a reader and writer from another crate
 let bytes = binaries.write("spirv", &module)?; // `module`: an mlirformat `spirv.module` op
-let op = binaries.read(&bytes)?;              // the format that recognizes the bytes reads them
+let op = binaries.read(&bytes)?;              // the reader that recognizes the bytes reads them
 ```
 
 ```rust
-pub trait Format: Send + Sync {
+pub trait Read: Send + Sync {
     fn name(&self) -> &'static str;
     fn recognizes(&self, bytes: &[u8]) -> bool;
-    fn write(&self, op: &Operation<'_>, pool: &dyn Pool) -> Result<Vec<u8>, Error>;
     fn read(&self, bytes: &[u8], pool: &dyn Pool) -> Result<Operation<'static>, Error>;
+}
+
+pub trait Write: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn write(&self, op: &Operation<'_>, pool: &dyn Pool) -> Result<Vec<u8>, Error>;
 }
 ```
 
@@ -29,11 +33,11 @@ Nothing is global: a program's formats are the ones it loads.
 
 Formats run on a thread pool: `Binaries::read_in` / `write_in` take any moremath `Executor`
 (`ThreadSingle`, `ThreadMulti`), the pools mlirformat's `parse_in` / `print_in` take; `read` / `write`
-run on the calling thread. A `Format` sees the pool as `&dyn Pool`.
+run on the calling thread. A reader or writer sees the pool as `&dyn Pool`.
 
 ## SPIR-V
 
-`SpirvFormat` reads and writes SPIR-V as `mlir-translate` (LLVM 23.1.5) does,
+`SpirvReader` and `SpirvWriter` read and write SPIR-V as `mlir-translate` (LLVM 23.1.5) does,
 checked against MLIR's own 250 `Target/SPIRV` test modules, all of them:
 
 - reading (`--deserialize-spirv`, `cargo test --test read`): structured control flow rebuilt from
@@ -51,7 +55,7 @@ The grammar tables (`src/spirv/tables.gen.rs`) are generated from the SPIR-V dia
 
 ## MLIR bytecode
 
-`BytecodeFormat` (`"mlirbc"`) reads and writes MLIR's own binary form,
+`BytecodeFormat` (`"mlirbc"`, both `Read` and `Write`) reads and writes MLIR's own binary form,
 the bytecode `mlir-opt --emit-bytecode` (23.1.5) writes, version 6. Checked against `mlir-opt` on
 one module of each upstream test file (2269, `tests/fixtures/mlirbc`, made by
 `scripts/mlirbc_fixtures.py`; `cargo test --test bytecode`):
@@ -71,7 +75,7 @@ lists the ops `mlir-opt` registers. The test dialect, which only `mlir-opt` has,
 
 ## GLSL
 
-`GlslFormat` (`"glsl"`) reads GLSL ES 1.00 / 3.00 source into mlirformat's `glsl` dialect: `glsl.shader`,
+`GlslFormat` (`"glsl"`, `Read` only so far) reads GLSL ES 1.00 / 3.00 source into mlirformat's `glsl` dialect: `glsl.shader`,
 its globals, built-ins and texture ops, the rest as `func` / `arith` / `math` / `vector` / `scf` and SPIR-V
 control flow and types — what mlirpass's `convert-glsl-to-spirv` lowers. `GlslFormat::new(Some(stage))`
 names the stage; without one, a source that writes `gl_Position` is a vertex shader. Checked on mlirpass's

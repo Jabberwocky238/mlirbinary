@@ -1,5 +1,5 @@
-//! SPIR-V: the binary `SpirvFormat` writes (`spirv.module` ⇒ words, as `mlir-translate
-//! --serialize-spirv` does) and reads back, and the grammar tables both use.
+//! SPIR-V: the binary `SpirvWriter` writes (`spirv.module` ⇒ words, as `mlir-translate
+//! --serialize-spirv` does) and `SpirvReader` reads back, and the grammar tables both use.
 
 mod read;
 mod write;
@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 use mlirformat::Attribute;
 
 pub use read::SpirvReader;
-pub use write::{SpirvFormat, SpirvWriter};
+pub use write::SpirvWriter;
 
 pub struct Avail<'t> {
     pub min: Option<u8>,

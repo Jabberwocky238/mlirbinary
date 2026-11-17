@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use mlirbinary::{Format, GlslFormat};
+use mlirbinary::{GlslFormat, Read};
 use mlirformat::glsl::{GlslDialect, GlslStage};
 use mlirformat::{Item, MlirOpt, Module, Operation};
 

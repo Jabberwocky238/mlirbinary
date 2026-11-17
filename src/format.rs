@@ -26,27 +26,33 @@ impl<X: Executor + Sync> Pool for X {
     }
 }
 
-/// A binary format: how one kind of op (a `spirv.module`, a GPU's kernel) is written as bytes, and
-/// read back. A crate outside mlirbinary implements it for its own format and hands it to
-/// `Binaries::load`, the way a dialect goes to mlirformat's `MlirOpt::load`.
-pub trait Format: Send + Sync {
-    /// The name `Binaries::write` and `Binaries::get` take ("spirv")
+/// Reading a format: the op some bytes hold. A crate outside mlirbinary implements it for its own
+/// format and hands it to `Binaries::reads`, the way a dialect goes to mlirformat's `MlirOpt::load`.
+pub trait Read: Send + Sync {
+    /// The format's name ("spirv")
     fn name(&self) -> &'static str;
 
-    /// Whether `bytes` are in this format (its magic number); `Binaries::read` asks each format
+    /// Whether `bytes` are in this format (its magic number); `Binaries::read` asks each reader
     fn recognizes(&self, bytes: &[u8]) -> bool;
-
-    /// `op` (the format's root op) as bytes, work spread over `pool`
-    fn write(&self, op: &Operation<'_>, pool: &dyn Pool) -> Result<Vec<u8>, Error>;
 
     /// The op `bytes` hold, in generic form, work spread over `pool`
     fn read(&self, bytes: &[u8], pool: &dyn Pool) -> Result<Operation<'static>, Error>;
 }
 
-/// The formats a program knows, loaded one by one; nothing is global.
+/// Writing a format: an op (the format's root op, a `spirv.module`, a GPU's kernel) as bytes
+pub trait Write: Send + Sync {
+    /// The format's name, the one `Binaries::write` takes ("spirv")
+    fn name(&self) -> &'static str;
+
+    /// `op` as bytes, work spread over `pool`
+    fn write(&self, op: &Operation<'_>, pool: &dyn Pool) -> Result<Vec<u8>, Error>;
+}
+
+/// The formats a program reads and writes, loaded one by one; nothing is global.
 #[derive(Default)]
 pub struct Binaries {
-    formats: Vec<Box<dyn Format>>,
+    readers: Vec<Box<dyn Read>>,
+    writers: Vec<Box<dyn Write>>,
 }
 
 impl Binaries {
@@ -57,25 +63,37 @@ impl Binaries {
     /// Every format this crate has
     pub fn builtin() -> Self {
         let mut b = Self::new();
-        b.load(crate::SpirvFormat::default());
-        b.load(crate::BytecodeFormat::default());
-        b.load(crate::GlslFormat::default());
+        b.reads(crate::SpirvReader::default()).writes(crate::SpirvWriter::default());
+        b.reads(crate::BytecodeFormat::default()).writes(crate::BytecodeFormat::default());
+        b.reads(crate::GlslFormat::default());
         b
     }
 
-    /// Adds `format`, replacing one of the same name
-    pub fn load(&mut self, format: impl Format + 'static) -> &mut Self {
-        self.formats.retain(|f| f.name() != format.name());
-        self.formats.push(Box::new(format));
+    /// Adds `reader`, replacing one of the same name
+    pub fn reads(&mut self, reader: impl Read + 'static) -> &mut Self {
+        self.readers.retain(|f| f.name() != reader.name());
+        self.readers.push(Box::new(reader));
         self
     }
 
-    pub fn get(&self, name: &str) -> Option<&dyn Format> {
-        self.formats.iter().find(|f| f.name() == name).map(|f| &**f)
+    /// Adds `writer`, replacing one of the same name
+    pub fn writes(&mut self, writer: impl Write + 'static) -> &mut Self {
+        self.writers.retain(|f| f.name() != writer.name());
+        self.writers.push(Box::new(writer));
+        self
     }
 
-    pub fn names(&self) -> Vec<&'static str> {
-        self.formats.iter().map(|f| f.name()).collect()
+    pub fn reader(&self, name: &str) -> Option<&dyn Read> {
+        self.readers.iter().find(|f| f.name() == name).map(|f| &**f)
+    }
+
+    pub fn writer(&self, name: &str) -> Option<&dyn Write> {
+        self.writers.iter().find(|f| f.name() == name).map(|f| &**f)
+    }
+
+    /// The formats read, then those written
+    pub fn names(&self) -> (Vec<&'static str>, Vec<&'static str>) {
+        (self.readers.iter().map(|f| f.name()).collect(), self.writers.iter().map(|f| f.name()).collect())
     }
 
     /// `op` in format `name`, on this thread
@@ -85,16 +103,16 @@ impl Binaries {
 
     /// `op` in format `name`, on the threads of `x`
     pub fn write_in<X: Executor + Sync>(&self, name: &str, op: &Operation<'_>, x: &X) -> Result<Vec<u8>, Error> {
-        self.get(name).ok_or_else(|| Error(format!("no binary format {name}")))?.write(op, x)
+        self.writer(name).ok_or_else(|| Error(format!("no writer for format {name}")))?.write(op, x)
     }
 
-    /// Reads `bytes` with the first format that recognizes them, on this thread
+    /// Reads `bytes` with the first reader that recognizes them, on this thread
     pub fn read(&self, bytes: &[u8]) -> Result<Operation<'static>, Error> {
         self.read_in(bytes, &ThreadSingle)
     }
 
-    /// Reads `bytes` with the first format that recognizes them, on the threads of `x`
+    /// Reads `bytes` with the first reader that recognizes them, on the threads of `x`
     pub fn read_in<X: Executor + Sync>(&self, bytes: &[u8], x: &X) -> Result<Operation<'static>, Error> {
-        self.formats.iter().find(|f| f.recognizes(bytes)).ok_or_else(|| Error(format!("no binary format recognizes these {} bytes", bytes.len())))?.read(bytes, x)
+        self.readers.iter().find(|f| f.recognizes(bytes)).ok_or_else(|| Error(format!("no reader recognizes these {} bytes", bytes.len())))?.read(bytes, x)
     }
 }

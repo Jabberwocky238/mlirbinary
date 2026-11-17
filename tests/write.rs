@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use mlirbinary::{Binaries, Format, SpirvFormat};
+use mlirbinary::{Binaries, Read, SpirvReader};
 use mlirformat::{Item, MlirOpt, Operation};
 
 fn dir() -> PathBuf {
@@ -52,5 +52,5 @@ fn writes_as_mlir_translate() {
     for f in &failed {
         eprintln!("  {f}");
     }
-    assert!(SpirvFormat::default().recognizes(&fs::read(dir().join(format!("{}.spv", stems[0]))).unwrap()));
+    assert!(SpirvReader::default().recognizes(&fs::read(dir().join(format!("{}.spv", stems[0]))).unwrap()));
 }

@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 
 use mlirformat::{Error, OpInfos, Operation};
 
-use crate::{Format, Pool};
+use crate::{Pool, Read, Write};
 
 /// How a property of an op is written, as its `writeProperties` does
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -68,6 +68,8 @@ pub struct BytecodeFormat {
 impl BytecodeFormat {
     /// The producer `mlir-opt` 23.1.5 names
     pub const UPSTREAM_PRODUCER: &'static str = "MLIR23.1.5";
+    /// The format's name
+    pub const NAME: &'static str = "mlirbc";
 
     /// The ops MLIR itself defines are registered: their properties are written natively
     pub fn new(infos: OpInfos) -> Self {
@@ -81,20 +83,26 @@ impl Default for BytecodeFormat {
     }
 }
 
-impl Format for BytecodeFormat {
+impl Read for BytecodeFormat {
     fn name(&self) -> &'static str {
-        "mlirbc"
+        Self::NAME
     }
 
     fn recognizes(&self, bytes: &[u8]) -> bool {
         bytes.starts_with(MAGIC)
     }
 
-    fn write(&self, op: &Operation<'_>, _pool: &dyn Pool) -> Result<Vec<u8>, Error> {
-        write::Writer::new(op, &self.infos)?.write(&self.producer)
-    }
-
     fn read(&self, bytes: &[u8], _pool: &dyn Pool) -> Result<Operation<'static>, Error> {
         read::Reader::new(bytes)?.read()
+    }
+}
+
+impl Write for BytecodeFormat {
+    fn name(&self) -> &'static str {
+        Self::NAME
+    }
+
+    fn write(&self, op: &Operation<'_>, _pool: &dyn Pool) -> Result<Vec<u8>, Error> {
+        write::Writer::new(op, &self.infos)?.write(&self.producer)
     }
 }

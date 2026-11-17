@@ -24,6 +24,20 @@ pub struct SpirvReader {
     pub structurize: bool,
 }
 
+impl crate::Read for SpirvReader {
+    fn name(&self) -> &'static str {
+        SpirvReader::NAME
+    }
+
+    fn recognizes(&self, bytes: &[u8]) -> bool {
+        bytes.get(..Reader::WORD).is_some_and(|m| u32::from_le_bytes([m[0], m[1], m[2], m[3]]) == SpirvReader::MAGIC)
+    }
+
+    fn read(&self, bytes: &[u8], _pool: &dyn crate::Pool) -> Result<Operation<'static>, Error> {
+        SpirvReader::read(self, bytes)
+    }
+}
+
 impl Default for SpirvReader {
     fn default() -> Self {
         Self { structurize: true }
@@ -31,6 +45,11 @@ impl Default for SpirvReader {
 }
 
 impl SpirvReader {
+    /// The format's name
+    pub const NAME: &'static str = "spirv";
+    /// The first word of a SPIR-V module
+    pub const MAGIC: u32 = 0x0723_0203;
+
     pub fn read(&self, bytes: &[u8]) -> Result<Operation<'static>, Error> {
         if !bytes.len().is_multiple_of(Reader::WORD) {
             return Err(Error(format!("{} bytes are not whole SPIR-V words", bytes.len())));

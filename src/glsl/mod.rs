@@ -4,12 +4,11 @@ mod lex;
 mod syntax;
 
 use alloc::string::String;
-use alloc::vec::Vec;
 
 use mlirformat::glsl::{GlslDialect, GlslStage};
 use mlirformat::{Dialect, Error, MlirOpt, OpInfos, Operation};
 
-use crate::{Format, Pool};
+use crate::{Pool, Read};
 use emit::GlslReader;
 
 /// GLSL (ES 1.00 / 3.00) source: read into mlirformat's `glsl` dialect (`glsl.shader`, its globals,
@@ -63,17 +62,13 @@ impl Default for GlslFormat {
     }
 }
 
-impl Format for GlslFormat {
+impl Read for GlslFormat {
     fn name(&self) -> &'static str {
         "glsl"
     }
 
     fn recognizes(&self, bytes: &[u8]) -> bool {
         core::str::from_utf8(bytes).is_ok_and(|s| Self::head(s).starts_with(Self::VERSION))
-    }
-
-    fn write(&self, _op: &Operation<'_>, _pool: &dyn Pool) -> Result<Vec<u8>, Error> {
-        Err(Error(String::from("glsl: writing is not there yet")))
     }
 
     fn read(&self, bytes: &[u8], _pool: &dyn Pool) -> Result<Operation<'static>, Error> {

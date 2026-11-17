@@ -12,7 +12,7 @@ mod tree;
 mod spirv;
 
 pub use bytecode::{BytecodeFormat, Prop, PropKind};
-pub use format::{Binaries, Format, Pool};
+pub use format::{Binaries, Pool, Read, Write};
 pub use glsl::GlslFormat;
 pub use ir::{BlockId, Ir, OpId, RegionId, ValueId};
 pub use spirv::*;

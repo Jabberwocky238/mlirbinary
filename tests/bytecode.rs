@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use mlirbinary::{Binaries, BytecodeFormat, Format};
+use mlirbinary::{Binaries, BytecodeFormat, Read};
 use mlirformat::{Item, MlirOpt};
 
 fn dir() -> PathBuf {

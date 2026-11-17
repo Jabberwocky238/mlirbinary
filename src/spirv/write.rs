@@ -13,7 +13,7 @@ use mlirformat::{Attribute, Const, Error, FloatKind, NamedAttr, Scalar, ShapedKi
 
 use super::{Arg, AttrKind, Code, EnumSpec, Group, OpSpec};
 use super::SpirvReader;
-use crate::{BlockId, Format, Ir, OpId, Pool, ValueId};
+use crate::{BlockId, Ir, OpId, Pool, ValueId, Write};
 use mlirformat::Operation;
 
 /// How a `spirv.module` is written: `mlir-translate --serialize-spirv`'s options
@@ -46,32 +46,13 @@ impl SpirvWriter {
     }
 }
 
-/// The SPIR-V binary format
-#[derive(Debug, Clone, Copy, Default)]
-pub struct SpirvFormat {
-    pub writer: SpirvWriter,
-    pub reader: SpirvReader,
-}
-
-impl SpirvFormat {
-    pub const MAGIC: u32 = 0x0723_0203;
-}
-
-impl Format for SpirvFormat {
+impl Write for SpirvWriter {
     fn name(&self) -> &'static str {
-        "spirv"
-    }
-
-    fn recognizes(&self, bytes: &[u8]) -> bool {
-        bytes.get(..4).is_some_and(|m| u32::from_le_bytes([m[0], m[1], m[2], m[3]]) == SpirvFormat::MAGIC)
+        SpirvReader::NAME
     }
 
     fn write(&self, op: &Operation<'_>, _pool: &dyn Pool) -> Result<Vec<u8>, Error> {
-        Ok(SpirvWriter::bytes(&self.writer.words(op)?))
-    }
-
-    fn read(&self, bytes: &[u8], _pool: &dyn Pool) -> Result<Operation<'static>, Error> {
-        self.reader.read(bytes)
+        Ok(SpirvWriter::bytes(&self.words(op)?))
     }
 }
 

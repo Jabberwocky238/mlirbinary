@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use mlirbinary::{Format, SpirvFormat, SpirvReader};
+use mlirbinary::{Read, SpirvReader};
 use mlirformat::{Item, MlirOpt, Module};
 
 mod common;
@@ -25,7 +25,7 @@ fn reads_as_mlir_translate(dir: &Path, reader: SpirvReader) {
     let (mut exact, mut failed) = (0, Vec::new());
     for stem in stems.iter().filter(|s| filter.as_deref().is_none_or(|f| s.contains(f))) {
         let bytes = fs::read(dir.join(format!("{stem}.spv"))).unwrap();
-        assert!(SpirvFormat::default().recognizes(&bytes));
+        assert!(SpirvReader::default().recognizes(&bytes));
         let text = fs::read_to_string(dir.join(format!("{stem}.read.mlir"))).unwrap();
         let want = Canon::of(&opt.parse(&text).unwrap(), SPIRV_FUNC);
         let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reader.read(&bytes))).map_err(|_| String::from("panicked")).and_then(|r| r.map_err(|e| e.0)).map(|op| Canon::of(&Module { items: vec![Item::Op(op)] }, SPIRV_FUNC));
