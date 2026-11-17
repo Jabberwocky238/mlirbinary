@@ -1,3 +1,7 @@
+mod build;
+mod lex;
+mod syntax;
+
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -9,13 +13,13 @@ use mlirformat::arith::{CmpFPredicate, CmpIPredicate};
 use mlirformat::spirv_types::{SpirvDecoration, SpirvMember, SpirvType};
 use mlirformat::{ApFloat, ApInt, Attribute, Const, Error, FloatKind, FunctionType, Op, Scalar as Lit, Signedness, Type};
 
-use super::lex::{Lexed, Version};
-use super::syntax::{BinOp, BlockLayout, Decl, Expr, Item, ParamQual, Parser, Qual, SamplerDim, Scalar, Stmt, StorageQual, StructDef, Ty, UnOp};
+use lex::{Lexed, Version};
+use syntax::{BinOp, BlockLayout, Decl, Expr, Item, ParamQual, Parser, Qual, SamplerDim, Scalar, Stmt, StorageQual, StructDef, Ty, UnOp};
 use mlirformat::glsl::{Builtin, BuiltinVar, Derivative, GlslCall, GlslConstruct, GlslDeriv, GlslDiscard, GlslGlobal, GlslLoad, GlslShader, GlslStage, GlslStore, GlslTexelFetch, GlslTexture, GlslTextureSize, Lod, Storage};
 
 use mlirformat::MlirOpt;
 
-use super::build::{OpData, Rw};
+use build::{OpData, Rw};
 use crate::tree::{B as BlockId, O as OpId, Tree, V as ValueId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -682,7 +686,7 @@ impl<'o, 'a, 's> Emitter<'o, 'a, 's> {
         Ok(SpirvType::Ptr { pointee: Box::new(ty.mlir(false)?), storage: String::from("Function") }.into())
     }
 
-    fn function(&mut self, ret: &Ty, name: &str, params: &[super::syntax::Param<'s>], body: &[Stmt<'s>]) -> Result<(), Error> {
+    fn function(&mut self, ret: &Ty, name: &str, params: &[syntax::Param<'s>], body: &[Stmt<'s>]) -> Result<(), Error> {
         let inputs = params.iter().map(|p| if p.qual == ParamQual::In { p.ty.mlir(false) } else { Self::pointer(&p.ty) }).collect::<Result<Vec<_>, _>>()?;
         let results = if *ret == Ty::Void { Vec::new() } else { vec![ret.mlir(false)?] };
         let fty = Type::Function(Box::new(FunctionType { inputs: inputs.clone(), results }));

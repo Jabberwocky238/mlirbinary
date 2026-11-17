@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generates src/bytecode/props.gen.rs: every op mlir-opt registers (the test dialect left out) and,
+"""Generates src/types/bytecode/props.gen.rs: every op mlir-opt registers (the test dialect left out) and,
 for those whose properties are stored natively, the order and encoding of each property in its
 bytecode, read off the `writeProperties` methods that mlir-tblgen generated in an LLVM build.
 
-usage: mlirbc_props.py <llvm build dir> > src/bytecode/props.gen.rs
+usage: mlirbc_props.py <llvm build dir> > src/types/bytecode/props.gen.rs
 """
 import glob, re, sys
 

@@ -51,3 +51,40 @@ fn reads_shaders() {
     }
     assert!(failed.is_empty());
 }
+
+/// Each shader read, written back as GLSL and read again; the source written goes to
+/// `target/glsl-written` with `SHOW`
+#[test]
+fn writes_shaders() {
+    let filter = std::env::var("FILTER").ok();
+    let show = std::env::var_os("SHOW").is_some();
+    let mut names: Vec<String> = fs::read_dir(dir()).unwrap().filter_map(|e| e.ok()?.file_name().into_string().ok()).filter(|n| n.ends_with(".vert") || n.ends_with(".frag")).collect();
+    names.sort();
+    let (mut ok, mut failed) = (0, Vec::new());
+    for name in names.iter().filter(|s| filter.as_deref().is_none_or(|f| s.contains(f))) {
+        let src = fs::read(dir().join(name)).unwrap();
+        let stage = if name.ends_with(".vert") { GlslStage::Vertex } else { GlslStage::Fragment };
+        let format = GlslFormat::new(Some(stage));
+        let pool = moremath::ThreadSingle;
+        let written = format.read(&src, &pool).and_then(|op| mlirbinary::Write::write(&format, &op, &pool));
+        match written {
+            Ok(text) => {
+                if show {
+                    let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/glsl-written");
+                    fs::create_dir_all(&out).unwrap();
+                    fs::write(out.join(name), &text).unwrap();
+                }
+                match format.read(&text, &pool) {
+                    Ok(_) => ok += 1,
+                    Err(e) => failed.push(format!("{name}: written source does not read back: {}", e.0)),
+                }
+            }
+            Err(e) => failed.push(format!("{name}: {}", e.0)),
+        }
+    }
+    eprintln!("{ok} of {} written and read back", ok + failed.len());
+    for f in &failed {
+        eprintln!("  {}", &f[..f.len().min(300)]);
+    }
+    assert!(failed.is_empty());
+}

@@ -50,7 +50,7 @@ checked against MLIR's own 250 `Target/SPIRV` test modules, all of them:
 - reading then writing (`cargo test --test roundtrip`): byte for byte what `mlir-translate`
   writes for the module it reads.
 
-The grammar tables (`src/spirv/tables.gen.rs`) are generated from the SPIR-V dialect's ODS by
+The grammar tables (`src/types/spirv/tables.gen.rs`) are generated from the SPIR-V dialect's ODS by
 `scripts/spirv_tables.py`.
 
 ## MLIR bytecode
@@ -70,17 +70,29 @@ one module of each upstream test file (2269, `tests/fixtures/mlirbc`, made by
   bits and `f8E8M0FNU`, dialect resources (`dense_resource` data).
 
 How each op's properties are written comes from the code mlir-tblgen generates:
-`scripts/mlirbc_props.py` reads it off an LLVM build into `src/bytecode/props.gen.rs`, which also
+`scripts/mlirbc_props.py` reads it off an LLVM build into `src/types/bytecode/props.gen.rs`, which also
 lists the ops `mlir-opt` registers. The test dialect, which only `mlir-opt` has, is left out.
 
 ## GLSL
 
-`GlslFormat` (`"glsl"`, `Read` only so far) reads GLSL ES 1.00 / 3.00 source into mlirformat's `glsl` dialect: `glsl.shader`,
+`GlslFormat` (`"glsl"`, both `Read` and `Write`) reads GLSL ES 1.00 / 3.00 source into mlirformat's `glsl` dialect: `glsl.shader`,
 its globals, built-ins and texture ops, the rest as `func` / `arith` / `math` / `vector` / `scf` and SPIR-V
 control flow and types — what mlirpass's `convert-glsl-to-spirv` lowers. `GlslFormat::new(Some(stage))`
 names the stage; without one, a source that writes `gl_Position` is a vertex shader. Checked on mlirpass's
 101 test shaders (`tests/fixtures/glsl`, `cargo test --test glsl`): each reads as mlirpass read it before
-the reader moved here. Writing GLSL is not there yet.
+the reader moved here.
+
+Writing turns a `glsl.shader` back into source: each value a local, loops and branches rebuilt from
+the structure reading left (selection merges, the loop layout), `int` / `uint` conversions where a
+value's signedness is only in its op, explicit locations, bindings, interpolation and precision
+kept. Struct members and uniform blocks get names (`m0`, `S_<hash>`, `<instance>_Block`): the dialect
+keeps none. Every test shader written reads back (`cargo test --test glsl`); in mlirpass's
+`tests/gl.rs` each one read and written draws on the local OpenGL bit for bit as its source does
+(where Mesa reassociates the source, as glslang's SPIR-V does).
+
+The crate root holds what formats and their users share: the `Read` / `Write` traits, `Pool`,
+`Binaries`, and the trees (`Ir`, read-only, which writers walk; a mutable one readers build in). Each
+format lives in `src/types/<format>/`.
 
 `Ir` is the read-only index the formats work on: every op, value, block and region of an mlirformat
 op tree numbered, operands and successors resolved by name.

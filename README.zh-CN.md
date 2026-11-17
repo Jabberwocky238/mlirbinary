@@ -38,7 +38,7 @@ pub trait Write: Send + Sync {
 - 写入（`--serialize-spirv`，`cargo test --test write`）：逐字节一致；
 - 读入再写出（`cargo test --test roundtrip`）：与 `mlir-translate` 读入同一模块后写出的结果逐字节一致。
 
-指令表 `src/spirv/tables.gen.rs` 由 `scripts/spirv_tables.py` 从 SPIR-V 方言的 ODS 生成。
+指令表 `src/types/spirv/tables.gen.rs` 由 `scripts/spirv_tables.py` 从 SPIR-V 方言的 ODS 生成。
 
 ## MLIR bytecode
 
@@ -48,11 +48,15 @@ pub trait Write: Send + Sync {
 - 读入：2245 个读出后打印成通用形式，与 `mlir-opt` 打印的完全一样（含值名）；2243 个读出再写回原样字节；
 - 还没有：llvm 方言的专用编码（调试信息、循环标注）、八位以下的浮点和 `f8E8M0FNU`、方言资源（`dense_resource` 的数据）。
 
-每个 op 的 properties 怎么写，取自 mlir-tblgen 生成的代码：`scripts/mlirbc_props.py` 从 LLVM 构建目录抽出来生成 `src/bytecode/props.gen.rs`，同时列出 `mlir-opt` 注册的全部 op。只有 `mlir-opt` 才有的 test 方言不在其中。
+每个 op 的 properties 怎么写，取自 mlir-tblgen 生成的代码：`scripts/mlirbc_props.py` 从 LLVM 构建目录抽出来生成 `src/types/bytecode/props.gen.rs`，同时列出 `mlir-opt` 注册的全部 op。只有 `mlir-opt` 才有的 test 方言不在其中。
 
 ## GLSL
 
-`GlslFormat`（名字 `"glsl"`，目前只实现 `Read`）把 GLSL ES 1.00 / 3.00 源码读成 mlirformat 的 `glsl` 方言：`glsl.shader` 及其全局变量、内置函数和纹理 op，其余是 `func` / `arith` / `math` / `vector` / `scf` 和 SPIR-V 的控制流与类型，正是 mlirpass 的 `convert-glsl-to-spirv` 要降的东西。`GlslFormat::new(Some(stage))` 指定阶段；不指定时，写了 `gl_Position` 的算顶点着色器。用 mlirpass 的 101 个测试着色器对拍（`tests/fixtures/glsl`，`cargo test --test glsl`）：每个读出的结果都和读入搬来之前 mlirpass 读出的一样。写出 GLSL 还没做。
+`GlslFormat`（名字 `"glsl"`，`Read`、`Write` 都实现）把 GLSL ES 1.00 / 3.00 源码读成 mlirformat 的 `glsl` 方言：`glsl.shader` 及其全局变量、内置函数和纹理 op，其余是 `func` / `arith` / `math` / `vector` / `scf` 和 SPIR-V 的控制流与类型，正是 mlirpass 的 `convert-glsl-to-spirv` 要降的东西。`GlslFormat::new(Some(stage))` 指定阶段；不指定时，写了 `gl_Position` 的算顶点着色器。用 mlirpass 的 101 个测试着色器对拍（`tests/fixtures/glsl`，`cargo test --test glsl`）：每个读出的结果都和读入搬来之前 mlirpass 读出的一样。
+
+写出把 `glsl.shader` 还原成源码：每个值落成局部变量，循环和分支按读入留下的结构（选择的 merge 块、循环的块布局）还原，有符号性只在 op 上的值补 `int` / `uint` 转换，显式 location、binding、插值和精度照留。结构体成员、uniform 块要自己起名（`m0`、`S_<哈希>`、`<实例>_Block`），因为方言里没有这些名字。全部测试着色器写出后都能读回（`cargo test --test glsl`）；在 mlirpass 的 `tests/gl.rs` 里，每个读入再写出的着色器在本机 OpenGL 上的渲染都和原始源码逐位一致（Mesa 对源码做了重结合的用例，与 glslang 的 SPIR-V 逐位一致）。
+
+crate 根下只放各格式和使用者共用的组件：`Read` / `Write` 两个 trait、`Pool`、`Binaries`，以及两种树（写出端遍历的只读 `Ir`，读入端在其上构建的可变树）。每种格式在 `src/types/<格式>/` 下各占一个目录。
 
 `Ir` 是各格式共用的只读索引：mlirformat op 树里每个 op、值、块、区域编号，操作数和后继按名字解析好。
 

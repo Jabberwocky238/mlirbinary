@@ -1,15 +1,14 @@
-mod build;
-mod emit;
-mod lex;
-mod syntax;
+mod read;
+mod write;
 
 use alloc::string::String;
+use alloc::vec::Vec;
 
 use mlirformat::glsl::{GlslDialect, GlslStage};
 use mlirformat::{Dialect, Error, MlirOpt, OpInfos, Operation};
 
-use crate::{Pool, Read};
-use emit::GlslReader;
+use crate::{Pool, Read, Write};
+use read::GlslReader;
 
 /// GLSL (ES 1.00 / 3.00) source: read into mlirformat's `glsl` dialect (`glsl.shader`, its globals,
 /// built-ins and texture ops, the rest as `func` / `arith` / `math` / `vector` / `scf` and SPIR-V
@@ -75,5 +74,16 @@ impl Read for GlslFormat {
         let src = core::str::from_utf8(bytes).map_err(|_| Error(String::from("glsl: the source is not UTF-8")))?;
         let (tree, op) = GlslReader::read(src, self.stage_of(src), &self.opt)?;
         Ok(tree.operation(op, &self.infos))
+    }
+}
+
+impl Write for GlslFormat {
+    fn name(&self) -> &'static str {
+        "glsl"
+    }
+
+    /// A `glsl.shader` op as GLSL source
+    fn write(&self, op: &Operation<'_>, _pool: &dyn Pool) -> Result<Vec<u8>, Error> {
+        Ok(write::Writer::new(op)?.write()?.into_bytes())
     }
 }
