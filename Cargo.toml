@@ -1,8 +1,8 @@
 [package]
 name = "mlirbinary"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2024"
-description = "Binary formats of MLIR modules in Rust: write and read them as mlirformat IR, with formats as plugins (SPIR-V built in)"
+description = "Binary formats of MLIR modules in Rust: write and read them as mlirformat IR, with formats as plugins (SPIR-V, MLIR bytecode, GLSL, GPU machine code built in)"
 license = "MIT"
 repository = "https://github.com/Jabberwocky238/mlirbinary"
 readme = "README.md"
@@ -11,7 +11,7 @@ categories = ["compilers", "encoding", "no-std"]
 exclude = ["tests"]
 
 [dependencies]
-mlirformat = { git = "https://github.com/Jabberwocky238/mlirformat.git", tag = "0.8.8", version = "0.8.8", default-features = false }
+mlirformat = { git = "https://github.com/Jabberwocky238/mlirformat.git", tag = "0.8.9", version = "0.8.9", default-features = false }
 libm = "0.2"
 moremath = { version = "0.2.1", default-features = false, features = ["alloc"] }
 
@@ -20,6 +20,3 @@ default = ["std"]
 # The standard library (without it the crate is `no_std` and needs `alloc`), mlirformat's `std`
 std = ["mlirformat/std", "moremath/std"]
 
-
-[patch."https://github.com/Jabberwocky238/mlirformat.git"]
-mlirformat = { path = "../mlirformat" }

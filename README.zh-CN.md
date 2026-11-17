@@ -58,6 +58,17 @@ pub trait Write: Send + Sync {
 
 写出把 `glsl.shader` 还原成源码：每个值落成局部变量，循环和分支按读入留下的结构（选择的 merge 块、循环的块布局）还原，有符号性只在 op 上的值补 `int` / `uint` 转换，显式 location、binding、插值和精度照留。结构体成员、uniform 块要自己起名（`m0`、`S_<哈希>`、`<实例>_Block`），因为方言里没有这些名字。全部测试着色器写出后都能读回（`cargo test --test glsl`）；在 mlirpass 的 `tests/gl.rs` 里，每个读入再写出的着色器在本机 OpenGL 上的渲染都和原始源码逐位一致（Mesa 对源码做了重结合的用例，与 glslang 的 SPIR-V 逐位一致）。
 
+## GPU 机器码与镜像
+
+各 GPU 指令集方言（mlirformat 的 `apple9`、`agx`、`rdna2`）按硬件实际执行的样子编码；命令流和记录组成的镜像写成各块内存的字节：
+
+- `Apple9Isa`、`Apple9Code`、`Apple9Writer`（`"apple9"`）：Apple G13 指令，跳转按标签回填；对拍 M4 上跑过的编码（`cargo test --test apple9`）。
+- `AgxIsa`、`AgxCode`、`AgxRecord`、`AgxImage`、`AgxWriter`（`"agx"`）：USC 指令按编码表、命令缓冲结构按布局打包；对拍 Mesa 的 AGX2 反汇编用例和 Mesa 的 `agx_pack`（`cargo test --test agx`，生成参照用 `scripts/agx_*_oracle.*`）。
+- `Rdna2Isa`、`Rdna2Words`、`Rdna2Pm4`、`Rdna2Code`、`Rdna2Image`、`Rdna2Writer`（`"rdna2"`）：GFX10 指令与 PM4 包；对拍 `llvm-mc -mcpu=gfx1036` 和 Mesa 的 `S_*` 寄存器宏（`cargo test --test rdna2`，生成参照用 `scripts/rdna2_*_oracle.sh`）。
+- `Pack`、`Template`：按方言的布局表把一条记录打包成 dword（`Template` 留着还在等地址的字段）。`ImageWriter` 写出 mlirpass 布局好的 `image.memory` 容器，每种 GPU 通过 `ImageTarget` 给出命令流和记录的字节。
+
+写出器把一个 op 里所有 kernel 的代码依次写出；`<Gpu>Code::of` 给出单个 kernel 的代码和启动它需要的参数。降到这些方言是 mlirpass 的事。
+
 crate 根下只放各格式和使用者共用的组件：`Read` / `Write` 两个 trait、`Pool`、`Binaries`，以及两种树（写出端遍历的只读 `Ir`，读入端在其上构建的可变树）。每种格式在 `src/types/<格式>/` 下各占一个目录。
 
 `Ir` 是各格式共用的只读索引：mlirformat op 树里每个 op、值、块、区域编号，操作数和后继按名字解析好。

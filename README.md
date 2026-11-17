@@ -95,6 +95,26 @@ keeps none. Every test shader written reads back (`cargo test --test glsl`); in 
 `tests/gl.rs` each one read and written draws on the local OpenGL bit for bit as its source does
 (where Mesa reassociates the source, as glslang's SPIR-V does).
 
+## GPU machine code and images
+
+Each GPU's instruction-set dialect (mlirformat's `apple9`, `agx`, `rdna2`) encoded as the hardware runs it,
+and an image of command streams and records written as its memories' bytes:
+
+- `Apple9Isa`, `Apple9Code`, `Apple9Writer` (`"apple9"`): Apple G13 instructions, jumps resolved against
+  their labels; checked against what an M4 ran (`cargo test --test apple9`).
+- `AgxIsa`, `AgxCode`, `AgxRecord`, `AgxImage`, `AgxWriter` (`"agx"`): USC instructions by their encoding
+  tables, command-buffer structs by their layouts; checked against Mesa's AGX2 disassembler cases and
+  Mesa's `agx_pack` (`cargo test --test agx`, oracles `scripts/agx_*_oracle.*`).
+- `Rdna2Isa`, `Rdna2Words`, `Rdna2Pm4`, `Rdna2Code`, `Rdna2Image`, `Rdna2Writer` (`"rdna2"`): GFX10
+  instructions and PM4 packets; checked against `llvm-mc -mcpu=gfx1036` and Mesa's `S_*` register macros
+  (`cargo test --test rdna2`, oracles `scripts/rdna2_*_oracle.sh`).
+- `Pack`, `Template`: a record of a dialect's layout tables packed into dwords (a `Template` keeps the
+  fields still waiting for an address). `ImageWriter` writes an `image.memory` container laid out by
+  mlirpass, each GPU giving its streams' and records' bytes through `ImageTarget`.
+
+The writers write every kernel's code in an op, one after the other; `<Gpu>Code::of` gives one kernel's
+code with what launching it needs. Lowering to these dialects is mlirpass's.
+
 The crate root holds what formats and their users share: the `Read` / `Write` traits, `Pool`,
 `Binaries`, and the trees (`Ir`, read-only, which writers walk; a mutable one readers build in). Each
 format lives in `src/types/<format>/`.
