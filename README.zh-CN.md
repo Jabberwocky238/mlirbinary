@@ -26,7 +26,7 @@ pub trait Format: Send + Sync {
 
 ## SPIR-V
 
-`SpirvFormat`（feature `spirv`，缺省开）按 `mlir-translate`（LLVM 23.1.5）的方式读写 SPIR-V，用 MLIR 自己的 250 个 `Target/SPIRV` 测试模块对拍，全部通过：
+`SpirvFormat`按 `mlir-translate`（LLVM 23.1.5）的方式读写 SPIR-V，用 MLIR 自己的 250 个 `Target/SPIRV` 测试模块对拍，全部通过：
 
 - 读入（`--deserialize-spirv`，`cargo test --test read`）：按 merge 指令还原结构化控制流、OpPhi 变块参数、常量在使用处物化、具名与递归结构体、特化常量及其运算、ARM 张量与 graph；比较的是通用形式文本，SSA 名重新编号。`SpirvReader { structurize: false }` 即 `--spirv-structurize-control-flow=false`：块保持平铺的分支图，结构化读不了的（比如循环里提前退出）也能读（`tests/fixtures/spirv-unstructured`）；
 - 写入（`--serialize-spirv`，`cargo test --test write`）：逐字节一致；
@@ -36,7 +36,7 @@ pub trait Format: Send + Sync {
 
 ## MLIR bytecode
 
-`BytecodeFormat`（名字 `"mlirbc"`，feature `bytecode`，缺省开）读写 MLIR 自己的二进制形式，即 `mlir-opt --emit-bytecode`（23.1.5）写的 bytecode（第 6 版）。对拍取上游每个测试文件一个模块，共 2269 个（`tests/fixtures/mlirbc`，由 `scripts/mlirbc_fixtures.py` 生成；`cargo test --test bytecode`）：
+`BytecodeFormat`（名字 `"mlirbc"`）读写 MLIR 自己的二进制形式，即 `mlir-opt --emit-bytecode`（23.1.5）写的 bytecode（第 6 版）。对拍取上游每个测试文件一个模块，共 2269 个（`tests/fixtures/mlirbc`，由 `scripts/mlirbc_fixtures.py` 生成；`cargo test --test bytecode`）：
 
 - 写入：2243 个逐字节一致。编号与 `mlir-opt` 相同（属性、类型、op 名按引用次数和方言排、值按区域编号、按使用情况判定隔离区域、按解析器的建表顺序推出 use-list 顺序）；内置属性/类型和 quant 方言的类型用各自的专用编码，其他方言的写成文本；
 - 读入：2245 个读出后打印成通用形式，与 `mlir-opt` 打印的完全一样（含值名）；2243 个读出再写回原样字节；
@@ -51,8 +51,6 @@ pub trait Format: Send + Sync {
 | feature | 缺省 | 是什么 |
 |---|---|---|
 | `std` | 是 | 标准库（不开时 crate 是 `no_std`，需要 `alloc`），以及 mlirformat 的 `std` |
-| `spirv` | 是 | SPIR-V 二进制格式 |
-| `bytecode` | 是 | MLIR bytecode |
 
 ## 许可
 

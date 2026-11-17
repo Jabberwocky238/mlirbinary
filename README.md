@@ -29,7 +29,7 @@ Nothing is global: a program's formats are the ones it loads.
 
 ## SPIR-V
 
-`SpirvFormat` (feature `spirv`, default) reads and writes SPIR-V as `mlir-translate` (LLVM 23.1.5) does,
+`SpirvFormat` reads and writes SPIR-V as `mlir-translate` (LLVM 23.1.5) does,
 checked against MLIR's own 250 `Target/SPIRV` test modules, all of them:
 
 - reading (`--deserialize-spirv`, `cargo test --test read`): structured control flow rebuilt from
@@ -47,7 +47,7 @@ The grammar tables (`src/spirv/tables.gen.rs`) are generated from the SPIR-V dia
 
 ## MLIR bytecode
 
-`BytecodeFormat` (`"mlirbc"`, feature `bytecode`, default) reads and writes MLIR's own binary form,
+`BytecodeFormat` (`"mlirbc"`) reads and writes MLIR's own binary form,
 the bytecode `mlir-opt --emit-bytecode` (23.1.5) writes, version 6. Checked against `mlir-opt` on
 one module of each upstream test file (2269, `tests/fixtures/mlirbc`, made by
 `scripts/mlirbc_fixtures.py`; `cargo test --test bytecode`):
@@ -73,8 +73,6 @@ op tree numbered, operands and successors resolved by name.
 | feature | default | what it is |
 |---|---|---|
 | `std` | yes | the standard library (without it the crate is `no_std` and needs `alloc`), mlirformat's `std` |
-| `spirv` | yes | the SPIR-V binary format |
-| `bytecode` | yes | MLIR bytecode |
 
 ## License
 
