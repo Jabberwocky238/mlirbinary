@@ -10,7 +10,7 @@ own format (a GPU's machine code, say) without changing mlirbinary.
 ```rust
 use mlirbinary::{Binaries, Format};
 
-let mut binaries = Binaries::builtin();       // the formats this crate has (SPIR-V)
+let mut binaries = Binaries::builtin();       // the formats this crate has (SPIR-V, MLIR bytecode)
 binaries.load(MyGpuFormat);                   // and one from another crate
 let bytes = binaries.write("spirv", &module)?; // `module`: an mlirformat `spirv.module` op
 let op = binaries.read(&bytes)?;              // the format that recognizes the bytes reads them
@@ -45,6 +45,26 @@ checked against MLIR's own 250 `Target/SPIRV` test modules, all of them:
 The grammar tables (`src/spirv/tables.gen.rs`) are generated from the SPIR-V dialect's ODS by
 `scripts/spirv_tables.py`.
 
+## MLIR bytecode
+
+`BytecodeFormat` (`"mlirbc"`, feature `bytecode`, default) reads and writes MLIR's own binary form,
+the bytecode `mlir-opt --emit-bytecode` (23.1.5) writes, version 6. Checked against `mlir-opt` on
+one module of each upstream test file (2269, `tests/fixtures/mlirbc`, made by
+`scripts/mlirbc_fixtures.py`; `cargo test --test bytecode`):
+
+- writing: 2243 byte for byte, numbered as `mlir-opt` numbers (attributes, types and op names by
+  use count and dialect, values per region, isolated regions found from their uses, use-list
+  orders from replaying the parser); builtin attributes and types and the quant dialect's types in
+  their own encoding, other dialects' as text;
+- reading: 2245 print in generic form as `mlir-opt` prints them, names included; 2243 written
+  back to the same bytes;
+- not yet: the llvm dialect's own encodings (debug info, loop annotations), floats under eight
+  bits and `f8E8M0FNU`, dialect resources (`dense_resource` data).
+
+How each op's properties are written comes from the code mlir-tblgen generates:
+`scripts/mlirbc_props.py` reads it off an LLVM build into `src/bytecode/props.gen.rs`, which also
+lists the ops `mlir-opt` registers. The test dialect, which only `mlir-opt` has, is left out.
+
 `Ir` is the read-only index the formats work on: every op, value, block and region of an mlirformat
 op tree numbered, operands and successors resolved by name.
 
@@ -54,6 +74,7 @@ op tree numbered, operands and successors resolved by name.
 |---|---|---|
 | `std` | yes | the standard library (without it the crate is `no_std` and needs `alloc`), mlirformat's `std` |
 | `spirv` | yes | the SPIR-V binary format |
+| `bytecode` | yes | MLIR bytecode |
 
 ## License
 

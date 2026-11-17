@@ -3,6 +3,7 @@ mod entity;
 #[path = "props.gen.rs"]
 mod props;
 mod quant;
+mod read;
 mod write;
 
 use alloc::string::String;
@@ -19,16 +20,16 @@ pub enum PropKind {
     Attr,
     /// An attribute that may be absent
     OptAttr,
-    /// `operandSegmentSizes` / `resultSegmentSizes`, as a sparse array
-    Segments,
-    /// An integer or enum stored natively
-    VarInt,
-    SignedVarInt,
+    /// `operandSegmentSizes` / `resultSegmentSizes`, as a sparse array, of this many segments
+    Segments(u8),
+    /// An integer or enum stored natively, shown as an integer attribute this wide
+    VarInt(u8),
+    SignedVarInt(u8),
     Bool,
     /// An optional integer: whether it is there, then it
-    OptVarInt,
+    OptVarInt(u8),
     /// A list of integers
-    VarInts,
+    VarInts(u8),
     String,
 }
 
@@ -93,7 +94,7 @@ impl Format for BytecodeFormat {
         write::Writer::new(op, &self.infos)?.write(&self.producer)
     }
 
-    fn read(&self, _bytes: &[u8]) -> Result<Operation<'static>, Error> {
-        Err(Error(String::from("bytecode: reading is not there yet")))
+    fn read(&self, bytes: &[u8]) -> Result<Operation<'static>, Error> {
+        read::Reader::new(bytes)?.read()
     }
 }

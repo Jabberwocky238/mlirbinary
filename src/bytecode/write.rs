@@ -64,7 +64,7 @@ struct Open {
 
 /// Numbers everything a module refers to the way `IRNumberingState` does, then writes it the way
 /// `BytecodeWriter` does
-pub(super) struct Writer<'o, 'a> {
+pub struct Writer<'o, 'a> {
     ir: Ir<'o, 'a>,
     ents: Entities,
     // Per op
@@ -226,7 +226,7 @@ impl<'o, 'a> Writer<'o, 'a> {
     }
 
     /// Whether MLIR registers op `name`, and if so the properties it stores natively, if any
-    fn registered(name: &str) -> Option<Option<&'static [Prop]>> {
+    pub fn registered(name: &str) -> Option<Option<&'static [Prop]>> {
         let table = super::props::PROPS;
         table.binary_search_by(|(n, _)| (*n).cmp(name)).ok().map(|k| table[k].1)
     }
@@ -763,15 +763,15 @@ impl Writer<'_, '_> {
                             Some(_) => raw.var_flag(self.number[*attrs.next().expect("a numbered property")], true),
                             None => raw.var(0),
                         },
-                        PropKind::Segments => {
+                        PropKind::Segments(_) => {
                             let Some(Attribute::DenseArray { values, .. }) = value else { return Err(bad()) };
                             let sizes = values.iter().map(|v| v.parse::<u64>()).collect::<Result<Vec<_>, _>>().map_err(|_| bad())?;
                             Self::sparse(&sizes, &mut raw);
                         }
-                        PropKind::VarInt => raw.var(value.map_or(Some(0), Self::int).ok_or_else(bad)? as u64),
-                        PropKind::SignedVarInt => raw.svar(value.map_or(Some(0), Self::int).ok_or_else(bad)?),
+                        PropKind::VarInt(_) => raw.var(value.map_or(Some(0), Self::int).ok_or_else(bad)? as u64),
+                        PropKind::SignedVarInt(_) => raw.svar(value.map_or(Some(0), Self::int).ok_or_else(bad)?),
                         PropKind::Bool => raw.byte(u8::from(!matches!(value, None | Some(Attribute::Bool(false))))),
-                        PropKind::OptVarInt => match value {
+                        PropKind::OptVarInt(_) => match value {
                             Some(Attribute::Array(xs)) if xs.is_empty() => raw.byte(0),
                             Some(Attribute::Array(xs)) => {
                                 raw.byte(1);
@@ -780,7 +780,7 @@ impl Writer<'_, '_> {
                             None => raw.byte(0),
                             Some(_) => return Err(bad()),
                         },
-                        PropKind::VarInts => {
+                        PropKind::VarInts(_) => {
                             let xs: Vec<i64> = match value {
                                 Some(Attribute::Array(xs)) => xs.iter().map(Self::int).collect::<Option<_>>().ok_or_else(bad)?,
                                 Some(Attribute::DenseArray { values, .. }) => values.iter().map(|v| v.parse().ok()).collect::<Option<_>>().ok_or_else(bad)?,

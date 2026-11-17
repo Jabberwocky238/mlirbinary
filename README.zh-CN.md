@@ -7,7 +7,7 @@
 ```rust
 use mlirbinary::{Binaries, Format};
 
-let mut binaries = Binaries::builtin();       // 本 crate 自带的格式（SPIR-V）
+let mut binaries = Binaries::builtin();       // 本 crate 自带的格式（SPIR-V、MLIR bytecode）
 binaries.load(MyGpuFormat);                   // 再加一个别的 crate 的
 let bytes = binaries.write("spirv", &module)?; // `module`：mlirformat 的 `spirv.module` op
 let op = binaries.read(&bytes)?;              // 认得这串字节的格式负责读
@@ -34,6 +34,16 @@ pub trait Format: Send + Sync {
 
 指令表 `src/spirv/tables.gen.rs` 由 `scripts/spirv_tables.py` 从 SPIR-V 方言的 ODS 生成。
 
+## MLIR bytecode
+
+`BytecodeFormat`（名字 `"mlirbc"`，feature `bytecode`，缺省开）读写 MLIR 自己的二进制形式，即 `mlir-opt --emit-bytecode`（23.1.5）写的 bytecode（第 6 版）。对拍取上游每个测试文件一个模块，共 2269 个（`tests/fixtures/mlirbc`，由 `scripts/mlirbc_fixtures.py` 生成；`cargo test --test bytecode`）：
+
+- 写入：2243 个逐字节一致。编号与 `mlir-opt` 相同（属性、类型、op 名按引用次数和方言排、值按区域编号、按使用情况判定隔离区域、按解析器的建表顺序推出 use-list 顺序）；内置属性/类型和 quant 方言的类型用各自的专用编码，其他方言的写成文本；
+- 读入：2245 个读出后打印成通用形式，与 `mlir-opt` 打印的完全一样（含值名）；2243 个读出再写回原样字节；
+- 还没有：llvm 方言的专用编码（调试信息、循环标注）、八位以下的浮点和 `f8E8M0FNU`、方言资源（`dense_resource` 的数据）。
+
+每个 op 的 properties 怎么写，取自 mlir-tblgen 生成的代码：`scripts/mlirbc_props.py` 从 LLVM 构建目录抽出来生成 `src/bytecode/props.gen.rs`，同时列出 `mlir-opt` 注册的全部 op。只有 `mlir-opt` 才有的 test 方言不在其中。
+
 `Ir` 是各格式共用的只读索引：mlirformat op 树里每个 op、值、块、区域编号，操作数和后继按名字解析好。
 
 ## Features
@@ -42,6 +52,7 @@ pub trait Format: Send + Sync {
 |---|---|---|
 | `std` | 是 | 标准库（不开时 crate 是 `no_std`，需要 `alloc`），以及 mlirformat 的 `std` |
 | `spirv` | 是 | SPIR-V 二进制格式 |
+| `bytecode` | 是 | MLIR bytecode |
 
 ## 许可
 

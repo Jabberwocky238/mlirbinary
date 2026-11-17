@@ -225,7 +225,7 @@ struct PendingStruct {
     members: Vec<Option<Type<'static>>>,
 }
 
-pub(super) struct Reader<'w> {
+pub struct Reader<'w> {
     words: &'w [u32],
     offset: usize,
     tree: Tree,
@@ -279,7 +279,7 @@ impl<'w> Reader<'w> {
     const LONG_WORD: u32 = 64;
     const WORD_BITS: u32 = 32;
     const DECORATION: &'static str = "Decoration";
-    pub(super) const CASE_SEGMENTS: &'static str = "case_operand_segments";
+    pub const CASE_SEGMENTS: &'static str = "case_operand_segments";
     const SEGMENTS: &'static str = "operandSegmentSizes";
     const SIGNED: u32 = 1;
     const MAX_MINOR: u32 = 6;

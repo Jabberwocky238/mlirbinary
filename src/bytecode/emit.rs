@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 /// A section's id, the first byte of the section (`bytecode::Section::ID`)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(super) enum Section {
+pub enum Section {
     String = 0,
     Dialect = 1,
     AttrType = 2,
@@ -15,7 +15,7 @@ pub(super) enum Section {
 
 /// Bytes being written, with the alignment their start needs (`EncodingEmitter`)
 #[derive(Default)]
-pub(super) struct Emitter {
+pub struct Emitter {
     pub bytes: Vec<u8>,
     align: u64,
 }
@@ -96,5 +96,77 @@ impl Emitter {
             }
         }
         self.raw(&inner.bytes);
+    }
+}
+/// Reads what `Emitter` writes
+pub struct Cursor<'b> {
+    pub bytes: &'b [u8],
+    pub at: usize,
+}
+
+impl<'b> Cursor<'b> {
+    pub fn new(bytes: &'b [u8]) -> Self {
+        Self { bytes, at: 0 }
+    }
+
+    pub fn done(&self) -> bool {
+        self.at >= self.bytes.len()
+    }
+
+    pub fn byte(&mut self) -> Option<u8> {
+        let b = *self.bytes.get(self.at)?;
+        self.at += 1;
+        Some(b)
+    }
+
+    pub fn take(&mut self, n: usize) -> Option<&'b [u8]> {
+        let s = self.bytes.get(self.at..self.at.checked_add(n)?)?;
+        self.at += n;
+        Some(s)
+    }
+
+    pub fn var(&mut self) -> Option<u64> {
+        let first = self.byte()?;
+        if first & 1 != 0 {
+            return Some(u64::from(first >> 1));
+        }
+        if first == 0 {
+            return Some(u64::from_le_bytes(self.take(8)?.try_into().ok()?));
+        }
+        let n = first.trailing_zeros() as usize + 1;
+        let mut buf = [0u8; 8];
+        buf[0] = first;
+        buf[1..n].copy_from_slice(self.take(n - 1)?);
+        Some(u64::from_le_bytes(buf) >> n)
+    }
+
+    pub fn svar(&mut self) -> Option<i64> {
+        let v = self.var()?;
+        Some(((v >> 1) as i64) ^ -((v & 1) as i64))
+    }
+
+    pub fn var_flag(&mut self) -> Option<(u64, bool)> {
+        let v = self.var()?;
+        Some((v >> 1, v & 1 != 0))
+    }
+
+    pub fn cstr(&mut self) -> Option<&'b [u8]> {
+        let end = self.bytes[self.at..].iter().position(|b| *b == 0)?;
+        let s = &self.bytes[self.at..self.at + end];
+        self.at += end + 1;
+        Some(s)
+    }
+
+    /// A section: its id and contents
+    pub fn section(&mut self) -> Option<(u8, &'b [u8])> {
+        let id = self.byte()?;
+        let len = self.var()? as usize;
+        if id & Emitter::ALIGNED != 0 {
+            let align = self.var()? as usize;
+            while self.at % align != 0 {
+                self.byte()?;
+            }
+        }
+        Some((id & !Emitter::ALIGNED, self.take(len)?))
     }
 }

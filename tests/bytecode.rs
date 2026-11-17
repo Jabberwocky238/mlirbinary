@@ -42,10 +42,54 @@ fn writes_as_mlir_opt() {
     eprintln!("{exact} of {} write byte for byte", exact + failed.len());
     /// Modules written byte for byte; the rest use the llvm dialect's own encodings, floats of
     /// fewer than eight bits or `f8E8M0FNU`, resources, or string elements of a dialect type
-    const FLOOR: usize = 2240;
+    const FLOOR: usize = 2243;
     assert!(filter.is_some() || std::env::var_os("MLIRBC_DIR").is_some() || exact >= FLOOR, "{exact} written byte for byte, fewer than {FLOOR}");
     for f in &failed {
         eprintln!("  {f}");
     }
     assert!(BytecodeFormat::default().recognizes(&fs::read(dir().join(format!("{}.mlirbc", stems[0]))).unwrap()));
+}
+
+/// Each `.mlirbc` read back prints as its `.in.mlir` does, and writes back to the same bytes
+#[test]
+fn reads_as_mlir_opt() {
+    let opt = MlirOpt::upstream();
+    let plain = MlirOpt::default();
+    let filter = std::env::var("FILTER").ok();
+    let mut stems: Vec<String> = fs::read_dir(dir()).unwrap().filter_map(|e| e.ok()?.file_name().into_string().ok()?.strip_suffix(".mlirbc").map(str::to_owned)).collect();
+    stems.sort();
+    let format = BytecodeFormat::default();
+    let (mut exact, mut round, mut failed) = (0, 0, Vec::new());
+    for stem in stems.iter().filter(|s| filter.as_deref().is_none_or(|f| s.contains(f))) {
+        let bytes = fs::read(dir().join(format!("{stem}.mlirbc"))).unwrap();
+        let text = fs::read_to_string(dir().join(format!("{stem}.in.mlir"))).unwrap();
+        let want = plain.show(&opt.parse(&text).unwrap()).to_string();
+        let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| format.read(&bytes))).map_err(|_| String::from("panicked")).and_then(|r| r.map_err(|e| e.0));
+        match got {
+            Ok(op) => {
+                if format.write(&op).is_ok_and(|b| b == bytes) {
+                    round += 1;
+                }
+                let got = plain.show(&mlirformat::Module { items: vec![Item::Op(op)] }).to_string();
+                if got == want {
+                    exact += 1;
+                } else {
+                    let line = got.lines().zip(want.lines()).position(|(a, b)| a != b).unwrap_or(0);
+                    failed.push(format!("{stem}: line {}: mlirbinary `{}` / mlir-opt `{}`", line + 1, got.lines().nth(line).unwrap_or("").trim(), want.lines().nth(line).unwrap_or("").trim()));
+                }
+            }
+            Err(e) => failed.push(format!("{stem}: {e}")),
+        }
+    }
+    eprintln!("{exact} of {} read as mlir-opt prints them, {round} written back byte for byte", exact + failed.len());
+    /// Modules read as printed, and read then written back to the same bytes; the rest use what
+    /// the writer leaves out, two print `distinct` ids or a calibrated bound otherwise
+    const READ_FLOOR: usize = 2245;
+    const ROUND_FLOOR: usize = 2243;
+    let all = filter.is_none() && std::env::var_os("MLIRBC_DIR").is_none();
+    assert!(!all || exact >= READ_FLOOR, "{exact} read as printed, fewer than {READ_FLOOR}");
+    assert!(!all || round >= ROUND_FLOOR, "{round} written back, fewer than {ROUND_FLOOR}");
+    for f in &failed {
+        eprintln!("  {}", &f[..f.len().min(300)]);
+    }
 }

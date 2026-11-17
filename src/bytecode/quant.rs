@@ -9,7 +9,7 @@ use super::entity::{Entities, Piece};
 
 /// The quant dialect's type codes (`QuantDialectTypes`)
 #[derive(Clone, Copy)]
-enum Q {
+pub enum Q {
     Any = 1,
     AnyWithExpressedType = 2,
     Calibrated = 3,
@@ -26,11 +26,11 @@ impl From<Q> for Piece {
 }
 
 /// `QuantizationFlags::Signed`
-const SIGNED: u64 = 1;
+pub const SIGNED: u64 = 1;
 
 /// The float storage types and their default bound (`QuantStorageTypeInterface`), the range
 /// being `-bound..=bound`
-const FLOAT_STORAGE: &[(FloatKind, i64)] = &[(FloatKind::F8E5M2, 57344), (FloatKind::F8E4M3FN, 448), (FloatKind::F4E2M1FN, 6)];
+pub const FLOAT_STORAGE: &[(FloatKind, i64)] = &[(FloatKind::F8E5M2, 57344), (FloatKind::F8E4M3FN, 448), (FloatKind::F4E2M1FN, 6)];
 
 /// Reads a quant type's body: whitespace, punctuation, numbers and type names
 struct Scan<'s> {
@@ -144,7 +144,7 @@ impl Storage {
 
 impl Entities {
     /// A quant dialect type, by its custom encoding
-    pub(super) fn quant(&mut self, name: &str, body: &str) -> Result<Vec<Piece>, Error> {
+    pub fn quant(&mut self, name: &str, body: &str) -> Result<Vec<Piece>, Error> {
         let mut s = Scan { s: body, at: 0 };
         s.expect("<")?;
         let p = match name {

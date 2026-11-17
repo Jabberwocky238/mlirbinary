@@ -36,7 +36,7 @@ impl Reader<'_> {
     }
 
     /// Hands each predecessor's OpPhi values to its branch, as `Deserializer::wireUpBlockArgument`
-    pub(super) fn wire_phis(&mut self) -> Result<(), Error> {
+    pub fn wire_phis(&mut self) -> Result<(), Error> {
         for ((pred, target), ids) in core::mem::take(&mut self.phis) {
             let term = self.tree.terminator(pred).ok_or_else(|| Error::from("OpPhi from a block without a terminator"))?;
             self.tree.at = Some(At::Before(term));
@@ -108,7 +108,7 @@ impl Reader<'_> {
 
     /// Puts each selection and loop into a `spirv.mlir.selection` / `spirv.mlir.loop`, as
     /// `Deserializer::structurizeControlFlow`
-    pub(super) fn structurize(&mut self) -> Result<(), Error> {
+    pub fn structurize(&mut self) -> Result<(), Error> {
         self.split_selection_headers();
         while !self.merges.is_empty() {
             let (header, m) = self.merges.remove(0);

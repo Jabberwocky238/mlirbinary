@@ -4,12 +4,12 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
-use mlirformat::{AffineBin, AffineExpr, AffineMap, Attribute, Const, Dim, Error, FloatKind, IntegerSet, IntoStatic, Scalar, Shaped, ShapedKind, Signedness, StridedLayout, Type};
+use mlirformat::{AffineBin, AffineExpr, AffineMap, ApInt, Attribute, Const, Dim, Error, FloatKind, IntegerSet, IntoStatic, Scalar, Shaped, ShapedKind, Signedness, StridedLayout, Type};
 
 /// What an attribute or a type is written with, in order; a nested attribute or type is its
 /// index in `Entities`, a string goes to the string section
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub(super) enum Piece {
+pub enum Piece {
     Var(u64),
     SVar(i64),
     Byte(u8),
@@ -22,21 +22,21 @@ pub(super) enum Piece {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub(super) enum Kind {
+pub enum Kind {
     Attr,
     Type,
 }
 
 /// How an attribute or a type is encoded: by its dialect, or as its text
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub(super) enum Enc {
+pub enum Enc {
     Custom(Vec<Piece>),
     /// The text written, and the text as given (its identity)
     Text(String, String),
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub(super) struct Entity {
+pub struct Entity {
     pub kind: Kind,
     pub dialect: String,
     pub enc: Enc,
@@ -57,7 +57,7 @@ impl Entity {
 
 /// The builtin dialect's attribute codes (`BuiltinDialectAttributes`)
 #[derive(Clone, Copy)]
-enum A {
+pub enum A {
     Array = 0,
     Dictionary = 1,
     String = 2,
@@ -87,7 +87,7 @@ enum A {
 
 /// The builtin dialect's type codes (`BuiltinDialectTypes`)
 #[derive(Clone, Copy)]
-enum T {
+pub enum T {
     Integer = 0,
     Index = 1,
     Function = 2,
@@ -108,7 +108,7 @@ enum T {
 
 /// An affine expression's code (`AffineExprBytecodeKind`)
 #[derive(Clone, Copy)]
-enum E {
+pub enum E {
     Dim = 0,
     Symbol = 1,
     Constant = 2,
@@ -121,7 +121,7 @@ enum E {
 
 /// An affine map's form (`AffineMapBytecodeKind`), the low bits of its header
 #[derive(Clone, Copy)]
-enum M {
+pub enum M {
     Identity = 0,
     Permutation = 1,
     ProjectedPermutation = 2,
@@ -147,7 +147,7 @@ impl From<E> for Piece {
 }
 
 /// The builtin float types' codes, in `FloatKind` order
-const FLOAT_CODES: &[(FloatKind, u64)] = &[
+pub const FLOAT_CODES: &[(FloatKind, u64)] = &[
     (FloatKind::BF16, 3),
     (FloatKind::F16, 4),
     (FloatKind::F32, 5),
@@ -169,7 +169,7 @@ const FLOAT_CODES: &[(FloatKind, u64)] = &[
 ];
 
 /// Each float type's width in bits, as `APFloat::bitcastToAPInt` gives it
-const FLOAT_BITS: &[(FloatKind, u32)] = &[
+pub const FLOAT_BITS: &[(FloatKind, u32)] = &[
     (FloatKind::BF16, 16),
     (FloatKind::F16, 16),
     (FloatKind::F32, 32),
@@ -191,23 +191,25 @@ const FLOAT_BITS: &[(FloatKind, u32)] = &[
 ];
 
 /// `ShapedType::kDynamic`
-const DYNAMIC: i64 = i64::MIN;
+pub const DYNAMIC: i64 = i64::MIN;
 /// The width `IndexType` stores an integer in (`IndexType::kInternalStorageBitWidth`)
-const INDEX_BITS: u32 = 64;
+pub const INDEX_BITS: u32 = 64;
 /// The bits of a word of an `APInt`
 const WORD_BITS: u32 = 64;
 /// The widest integer a byte holds
 const BYTE_BITS: u32 = 8;
 /// A splat of `true` in a packed `i1` dense attribute
-const SPLAT_TRUE: u8 = 0xFF;
+pub const SPLAT_TRUE: u8 = 0xFF;
 
-pub(super) const BUILTIN: &str = "builtin";
+pub const BUILTIN: &str = "builtin";
+/// `DenseResourceElementsAttr`'s code: read, not written (resources are not)
+pub const DENSE_RESOURCE: u64 = 16;
 /// The quant dialect, whose types have their own encoding
 const QUANT: &str = "quant";
 
 /// Every attribute and type a module refers to, each once
 #[derive(Default)]
-pub(super) struct Entities {
+pub struct Entities {
     pub list: Vec<Entity>,
     index: BTreeMap<Entity, usize>,
     /// The `distinct` attributes, by their id in the text
@@ -506,7 +508,11 @@ impl Entities {
         Ok(match name {
             "dense" => {
                 let ty = ty.ok_or_else(|| err("untyped dense attribute", a))?;
-                if inner()?.starts_with('"') {
+                if let Some(hex) = inner()?.strip_prefix("\"0x").and_then(|h| h.strip_suffix('"')) {
+                    let view = Self::shaped_view(ty).ok_or_else(|| err("dense attribute", a))?;
+                    let values = Self::raw_values(view.element_type(), hex).ok_or_else(|| err("dense attribute", a))?;
+                    vec![A::DenseTypedElements.into(), Piece::Type(self.ty(ty)?), Piece::Blob(Self::dense_data(&view, &values)?)]
+                } else if inner()?.starts_with('"') {
                     self.dense_strings(ty, inner()?)?
                 } else {
                     let view = Self::shaped_view(ty).ok_or_else(|| err("dense attribute", a))?;
@@ -583,6 +589,29 @@ impl Entities {
             }
             _ => None,
         }
+    }
+
+    /// The elements of a dense attribute given as its raw data in hex, as MLIR stores them
+    fn raw_values(elem: &Type<'_>, hex: &str) -> Option<Vec<Scalar>> {
+        let bytes: Vec<u8> = (0..hex.len() / 2).map(|i| u8::from_str_radix(hex.get(2 * i..2 * i + 2)?, 16).ok()).collect::<Option<_>>()?;
+        let (part, complex) = match elem {
+            Type::Complex(p) => (&**p, true),
+            t => (t, false),
+        };
+        let width = match part {
+            Type::Integer { width, .. } => *width,
+            Type::Index => INDEX_BITS,
+            Type::Float(k) => Self::float_bits(*k).ok()?,
+            _ => return None,
+        };
+        let w = width.div_ceil(BYTE_BITS) as usize;
+        let read = |c: &[u8]| {
+            let mut b = [0u8; 16];
+            b[..c.len()].copy_from_slice(c);
+            ApInt::from_bits(width, u128::from_le_bytes(b))
+        };
+        let step = if complex { 2 * w } else { w };
+        Some(bytes.chunks(step).map(|c| if complex { Scalar::Complex(read(&c[..w]), read(&c[w..])) } else { Scalar::Int(read(c)) }).collect())
     }
 
     fn dense_strings(&mut self, ty: &Type<'_>, inner: &str) -> Result<Vec<Piece>, Error> {
