@@ -8,7 +8,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use mlirformat::agx::{AGX, AgxKernel, Usc, UscKind};
-use mlirformat::isa::ShaderStage;
+use mlirformat::isa::{IsaInt, ShaderStage};
 use mlirformat::{Attribute, Error, NamedAttr, Op, Operation};
 
 use crate::{ImageTarget, Ir, OpId, Pack, Pool, Write};
@@ -24,7 +24,7 @@ impl AgxIsa {
         let kind = enc.name();
         let Attribute::Dict(d) = a else { return Err(Error(format!("{kind}: {a} is not an operand dictionary"))) };
         let k = d.iter().find(|n| n.name == "case").and_then(|n| n.value.as_ref()).ok_or_else(|| Error(format!("{kind}: no case")))?;
-        let k = mlirformat::agx::UscField::int(k)? as usize;
+        let k = IsaInt::try_from(k)?.0 as usize;
         let case = enc.cases().get(k).ok_or_else(|| Error(format!("{kind} has no case {k}")))?;
         let mut v = case.value;
         for n in d {
