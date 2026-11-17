@@ -183,6 +183,11 @@ impl<'o, 'a> Ir<'o, 'a> {
         scopes.iter().rev().find_map(|s| of(s).get(&bare).copied())
     }
 
+    /// How many ops, values, blocks and regions there are; each id is below its count
+    pub fn counts(&self) -> (usize, usize, usize, usize) {
+        (self.ops.len(), self.values.len(), self.blocks.len(), self.regions.len())
+    }
+
     pub fn block_ops(&self, b: BlockId) -> Vec<OpId> {
         self[b].ops.clone()
     }

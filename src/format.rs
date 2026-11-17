@@ -33,10 +33,13 @@ impl Binaries {
     }
 
     /// Every format this crate has (with its features)
+    #[cfg_attr(not(any(feature = "spirv", feature = "bytecode")), allow(unused_mut))]
     pub fn builtin() -> Self {
         let mut b = Self::new();
         #[cfg(feature = "spirv")]
         b.load(crate::SpirvFormat::default());
+        #[cfg(feature = "bytecode")]
+        b.load(crate::BytecodeFormat::default());
         b
     }
 

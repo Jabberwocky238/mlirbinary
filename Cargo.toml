@@ -14,8 +14,10 @@ exclude = ["tests"]
 mlirformat = { git = "https://github.com/Jabberwocky238/mlirformat.git", tag = "0.8.7", version = "0.8.7", default-features = false }
 
 [features]
-default = ["std", "spirv"]
+default = ["std", "spirv", "bytecode"]
 # The standard library (without it the crate is `no_std` and needs `alloc`), mlirformat's `std`
 std = ["mlirformat/std"]
 # The SPIR-V binary format (`SpirvFormat`)
 spirv = []
+# MLIR bytecode (`BytecodeFormat`)
+bytecode = []
