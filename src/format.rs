@@ -66,6 +66,7 @@ impl Binaries {
         b.reads(crate::SpirvReader::default()).writes(crate::SpirvWriter::default()).writes(crate::SpirvGlsl);
         b.reads(crate::BytecodeFormat::default()).writes(crate::BytecodeFormat::default());
         b.reads(crate::GlslFormat::default()).writes(crate::GlslFormat::default());
+        b.writes(crate::Apple9Writer).writes(crate::AgxWriter);
         b
     }
 
